@@ -304,34 +304,27 @@ function computeUnfoldedPanel(g) {
     W3x = Px; W3y = Py;
   }
 
-  // --- Local coordinate system aligned with back wall ---
+  // --- Stretch in world space perpendicular to back wall ---
+  // This keeps the same orientation as the floor plan so the shape
+  // is immediately recognizable.
   var uParaX = Math.cos(wallAngle), uParaY = Math.sin(wallAngle);
   var uPerpX = Math.sin(wallAngle), uPerpY = -Math.cos(wallAngle);
-
-  function toLocal(vx, vy) {
-    var dx = vx - Px, dy = vy - Py;
-    return [dx * uParaX + dy * uParaY, dx * uPerpX + dy * uPerpY];
-  }
-
-  var lP = [0, 0];
-  var lW = toLocal(Wx, Wy);
-  var lW2 = toLocal(W2x, W2y);
-  var lPost = toLocal(PostX, PostY);
-  var lW3 = toLocal(W3x, W3y);
-
-  // --- Stretch perpendicular to back wall by 1/cos(pitch) ---
   var stretchFactor = 1 / Math.cos(g.rad);
 
-  // Negate perp so back wall (ridge) appears at top of canvas
-  function stretch(lpt) {
-    return [lpt[0], -lpt[1] * stretchFactor];
+  function stretchWorld(vx, vy) {
+    var dx = vx - Px, dy = vy - Py;
+    var para = dx * uParaX + dy * uParaY;
+    var perp = dx * uPerpX + dy * uPerpY;
+    perp *= stretchFactor;
+    return [Px + para * uParaX + perp * uPerpX,
+            Py + para * uParaY + perp * uPerpY];
   }
 
-  var sP = stretch(lP);
-  var sW = stretch(lW);
-  var sW2 = stretch(lW2);
-  var sPost = stretch(lPost);
-  var sW3 = stretch(lW3);
+  var sP = stretchWorld(Px, Py);
+  var sW = stretchWorld(Wx, Wy);
+  var sW2 = stretchWorld(W2x, W2y);
+  var sPost = stretchWorld(PostX, PostY);
+  var sW3 = stretchWorld(W3x, W3y);
 
   // --- Edge length helper ---
   function dist(a, b) {
@@ -344,19 +337,18 @@ function computeUnfoldedPanel(g) {
   var arcAngleW3 = Math.atan2(W3y, W3x);
   var arcAngleP = Math.atan2(Py, Px);
   var arcSpan = arcAngleP - arcAngleW3;
-  // Normalize to shortest arc via [-PI, PI]
   while (arcSpan > Math.PI) arcSpan -= 2 * Math.PI;
   while (arcSpan < -Math.PI) arcSpan += 2 * Math.PI;
 
   var arcPtsStretched = [];
   for (var ai = 1; ai < ARC_N; ai++) {
     var theta = arcAngleW3 + ai * arcSpan / ARC_N;
-    arcPtsStretched.push(stretch(toLocal(r * Math.cos(theta), r * Math.sin(theta))));
+    var ax = r * Math.cos(theta), ay = r * Math.sin(theta);
+    arcPtsStretched.push(stretchWorld(ax, ay));
   }
 
   // Full polygon: 5 main vertices + arc samples (W3 → arc → P)
   var pts = [sP, sW, sW2, sPost, sW3].concat(arcPtsStretched);
-  // Keep reference to 5 main vertices for corner labels
   var mainVerts = [sP, sW, sW2, sPost, sW3];
 
   // --- Straight edge lengths ---
@@ -374,7 +366,6 @@ function computeUnfoldedPanel(g) {
   }
   domeArcLen += dist(arcPrev, sP);
 
-  // Arc midpoint for label placement
   var arcMidPt = arcPtsStretched[Math.floor(arcPtsStretched.length / 2)];
 
   // --- Area via Shoelace formula on full polygon (with arc) ---
