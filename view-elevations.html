@@ -123,6 +123,19 @@
   <p>Rotate the viewing angle to see the dome with wings from any direction</p>
 </header>
 
+<div class="controls">
+  <div class="slider-row">
+    <label for="pitch-slider">Roof Pitch:</label>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
+    <span class="value" id="pitch-value">20.0&deg;</span>
+  </div>
+  <div class="slider-row" style="margin-top: 8px;">
+    <label for="angle-slider">View Angle:</label>
+    <input type="range" id="angle-slider" min="0" max="360" step="1" value="0">
+    <span class="value" id="angle-value">S 0&deg;</span>
+  </div>
+</div>
+
 <div class="canvas-row">
   <div class="canvas-wrap">
     <canvas id="front-elevation" width="1400" height="900"></canvas>
@@ -134,19 +147,6 @@
 <div class="canvas-row" style="justify-content: center;">
   <div class="canvas-wrap" style="max-width: 700px;">
     <canvas id="junction-detail" width="1400" height="900"></canvas>
-  </div>
-</div>
-
-<div class="controls">
-  <div class="slider-row">
-    <label for="pitch-slider">Roof Pitch:</label>
-    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
-    <span class="value" id="pitch-value">20.0&deg;</span>
-  </div>
-  <div class="slider-row" style="margin-top: 8px;">
-    <label for="angle-slider">View Angle:</label>
-    <input type="range" id="angle-slider" min="0" max="360" step="1" value="0">
-    <span class="value" id="angle-value">S 0&deg;</span>
   </div>
 </div>
 
@@ -448,31 +448,59 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
 
   var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
 
+  // --- Background ---
+  if (opaque) {
+    // Sky gradient
+    var skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+    skyGrad.addColorStop(0, '#87CEEB');
+    skyGrad.addColorStop(0.7, '#C8E6F0');
+    skyGrad.addColorStop(1, '#E8F4E8');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, w, h);
+    // Green ground
+    ctx.fillStyle = '#7AB648';
+    ctx.fillRect(t.tx(xMin), t.ty(0), t.tx(xMax) - t.tx(xMin), h - t.ty(0));
+  }
+
   // --- Draw ground ---
-  drawLine(ctx, t, xMin + 1, 0, xMax - 1, 0, '#8B7355', 2);
-  ctx.save();
-  ctx.fillStyle = '#f0ead6';
-  ctx.fillRect(t.tx(xMin + 1), t.ty(0), t.tx(xMax - 1) - t.tx(xMin + 1), t.ty(-2) - t.ty(0));
-  ctx.restore();
-  drawText(ctx, t, 0, -1.5, 'GROUND', { size: 10, color: '#8B7355', weight: '600' });
+  if (!opaque) {
+    drawLine(ctx, t, xMin + 1, 0, xMax - 1, 0, '#8B7355', 2);
+    ctx.save();
+    ctx.fillStyle = '#f0ead6';
+    ctx.fillRect(t.tx(xMin + 1), t.ty(0), t.tx(xMax - 1) - t.tx(xMin + 1), t.ty(-2) - t.ty(0));
+    ctx.restore();
+    drawText(ctx, t, 0, -1.5, 'GROUND', { size: 10, color: '#8B7355', weight: '600' });
+  }
 
   // --- Drawing helpers ---
 
   function drawDomeShape() {
-    var riserAlpha = opaque ? 0.85 : 0.2;
-    var shellAlpha = opaque ? 0.85 : 0.15;
-    // Riser wall
-    ctx.save();
-    ctx.fillStyle = 'rgba(180, 180, 170, ' + riserAlpha + ')';
-    ctx.fillRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
-    ctx.restore();
-    drawLine(ctx, t, -domeR, 0, -domeR, RISER_H, '#666', 2);
-    drawLine(ctx, t, domeR, 0, domeR, RISER_H, '#666', 2);
-    drawLine(ctx, t, -domeR, RISER_H, domeR, RISER_H, '#666', 1.5);
-    drawText(ctx, t, 0, RISER_H / 2, "RISER (8')", { size: 10, color: '#666', weight: '600' });
-    // Dome shell (always a semicircle — rotationally symmetric)
-    drawFilledArc(ctx, t, 0, RISER_H, domeR, 0, 180, 'rgba(173, 216, 230, ' + shellAlpha + ')');
-    drawArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#2c3e50', 2.5);
+    if (opaque) {
+      // Solid riser wall
+      ctx.save();
+      ctx.fillStyle = '#B8B0A0';
+      ctx.fillRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
+      ctx.strokeStyle = '#8A8278';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
+      ctx.restore();
+      // Solid dome shell
+      drawFilledArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#D4E8EF');
+      drawArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#6A9BB5', 2);
+    } else {
+      // Riser wall
+      ctx.save();
+      ctx.fillStyle = 'rgba(180, 180, 170, 0.2)';
+      ctx.fillRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
+      ctx.restore();
+      drawLine(ctx, t, -domeR, 0, -domeR, RISER_H, '#666', 2);
+      drawLine(ctx, t, domeR, 0, domeR, RISER_H, '#666', 2);
+      drawLine(ctx, t, -domeR, RISER_H, domeR, RISER_H, '#666', 1.5);
+      drawText(ctx, t, 0, RISER_H / 2, "RISER (8')", { size: 10, color: '#666', weight: '600' });
+      // Dome shell
+      drawFilledArc(ctx, t, 0, RISER_H, domeR, 0, 180, 'rgba(173, 216, 230, 0.15)');
+      drawArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#2c3e50', 2.5);
+    }
   }
 
   function drawWingShape(wing, color) {
@@ -486,45 +514,77 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
     // Skip if edge-on (too narrow to draw)
     if (Math.abs(t.tx(rightPX) - t.tx(leftPX)) < 4) return;
 
-    // Filled trapezoid: conn ground → post ground → post roof → conn roof
-    ctx.save();
-    ctx.globalAlpha = opaque ? 0.85 : 0.1;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(t.tx(connPX), t.ty(0));
-    ctx.lineTo(t.tx(postPX), t.ty(0));
-    ctx.lineTo(t.tx(postPX), t.ty(postH));
-    ctx.lineTo(t.tx(connPX), t.ty(connH));
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-    ctx.restore();
-
-    // Roof line
-    drawLine(ctx, t, connPX, connH, postPX, postH, color, 2.5);
-    // Vertical edges
-    drawLine(ctx, t, connPX, 0, connPX, connH, color, 2);
-    drawLine(ctx, t, postPX, 0, postPX, postH, color, 2);
-    // Connection dot
-    drawDot(ctx, t, connPX, connH, 5, color);
+    if (opaque) {
+      // Solid wall fill
+      ctx.save();
+      ctx.fillStyle = '#C8B898';
+      ctx.beginPath();
+      ctx.moveTo(t.tx(connPX), t.ty(0));
+      ctx.lineTo(t.tx(postPX), t.ty(0));
+      ctx.lineTo(t.tx(postPX), t.ty(postH));
+      ctx.lineTo(t.tx(connPX), t.ty(connH));
+      ctx.closePath();
+      ctx.fill();
+      // Subtle edge
+      ctx.strokeStyle = '#8A7A5A';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+      // Roof line
+      drawLine(ctx, t, connPX, connH, postPX, postH, '#6A5A3A', 2.5);
+    } else {
+      // Transparent fill
+      ctx.save();
+      ctx.globalAlpha = 0.1;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(t.tx(connPX), t.ty(0));
+      ctx.lineTo(t.tx(postPX), t.ty(0));
+      ctx.lineTo(t.tx(postPX), t.ty(postH));
+      ctx.lineTo(t.tx(connPX), t.ty(connH));
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.restore();
+      // Roof line
+      drawLine(ctx, t, connPX, connH, postPX, postH, color, 2.5);
+      // Vertical edges
+      drawLine(ctx, t, connPX, 0, connPX, connH, color, 2);
+      drawLine(ctx, t, postPX, 0, postPX, postH, color, 2);
+      // Connection dot
+      drawDot(ctx, t, connPX, connH, 5, color);
+    }
   }
 
   function drawEntryShape() {
     var projW = Math.abs(t.tx(entryMaxPX) - t.tx(entryMinPX));
     if (projW < 4) return; // edge-on, skip
 
-    var entryAlpha = opaque ? 0.85 : 0.3;
-    ctx.save();
-    ctx.fillStyle = 'rgba(210, 180, 140, ' + entryAlpha + ')';
-    ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
-      t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
-    ctx.restore();
-    drawLine(ctx, t, entryMinPX, 0, entryMinPX, entryH, '#8B6914', 2);
-    drawLine(ctx, t, entryMaxPX, 0, entryMaxPX, entryH, '#8B6914', 2);
-    drawLine(ctx, t, entryMinPX, entryH, entryMaxPX, entryH, '#8B6914', 2);
-    if (projW > 30)
-      drawText(ctx, t, (entryMinPX + entryMaxPX) / 2, entryH / 2, 'ENTRY',
-        { size: 11, color: '#8B6914', weight: '600' });
+    if (opaque) {
+      ctx.save();
+      ctx.fillStyle = '#C8B898';
+      ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
+        t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
+      ctx.strokeStyle = '#8A7A5A';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(t.tx(entryMinPX), t.ty(entryH),
+        t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
+      ctx.restore();
+      // Roof line
+      drawLine(ctx, t, entryMinPX, entryH, entryMaxPX, entryH, '#6A5A3A', 2);
+    } else {
+      ctx.save();
+      ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
+      ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
+        t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
+      ctx.restore();
+      drawLine(ctx, t, entryMinPX, 0, entryMinPX, entryH, '#8B6914', 2);
+      drawLine(ctx, t, entryMaxPX, 0, entryMaxPX, entryH, '#8B6914', 2);
+      drawLine(ctx, t, entryMinPX, entryH, entryMaxPX, entryH, '#8B6914', 2);
+      if (projW > 30)
+        drawText(ctx, t, (entryMinPX + entryMaxPX) / 2, entryH / 2, 'ENTRY',
+          { size: 11, color: '#8B6914', weight: '600' });
+    }
   }
 
   // --- Depth-sorted drawing (back-to-front) ---
@@ -545,24 +605,26 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
     }
   });
 
-  // --- Dimension lines ---
-  var dimX = xMax - 3;
-  drawDimArrow(ctx, t, dimX, 0, dimX, domePeak, domePeak.toFixed(1) + "'", '#2c3e50', 'right');
-  drawText(ctx, t, dimX + 2.5, domePeak - 2, 'PEAK', { size: 9, color: '#2c3e50', weight: '600', align: 'left' });
+  // --- Dimension lines (transparent view only) ---
+  if (!opaque) {
+    var dimX = xMax - 3;
+    drawDimArrow(ctx, t, dimX, 0, dimX, domePeak, domePeak.toFixed(1) + "'", '#2c3e50', 'right');
+    drawText(ctx, t, dimX + 2.5, domePeak - 2, 'PEAK', { size: 9, color: '#2c3e50', weight: '600', align: 'left' });
 
-  var dimXR = -domeR - 2;
-  drawDimArrow(ctx, t, dimXR, 0, dimXR, RISER_H, RISER_H.toFixed(0) + "'", '#666', 'left');
+    var dimXR = -domeR - 2;
+    drawDimArrow(ctx, t, dimXR, 0, dimXR, RISER_H, RISER_H.toFixed(0) + "'", '#666', 'left');
 
-  drawDimArrow(ctx, t, -domeR, -1.8, domeR, -1.8, (domeR * 2).toFixed(0) + "' dia", '#2c3e50');
+    drawDimArrow(ctx, t, -domeR, -1.8, domeR, -1.8, (domeR * 2).toFixed(0) + "' dia", '#2c3e50');
 
-  // Wing connection height (use nearest wing's connection)
-  var nearWing = (rightAvgD < leftAvgD) ? rightWing : leftWing;
-  var nearConnPX = projX(nearWing[0].wx, nearWing[0].wy);
-  var nearPostPX = projX(nearWing[1].wx, nearWing[1].wy);
-  drawDimArrow(ctx, t, nearConnPX + 2, 0, nearConnPX + 2, LEFT_WALL_H,
-    LEFT_WALL_H.toFixed(0) + "'", '#c0392b', 'right');
-  drawDimArrow(ctx, t, nearPostPX + 2, 0, nearPostPX + 2, RIGHT_POST_H,
-    RIGHT_POST_H.toFixed(0) + "'", '#c0392b', 'right');
+    // Wing connection height (use nearest wing's connection)
+    var nearWing = (rightAvgD < leftAvgD) ? rightWing : leftWing;
+    var nearConnPX = projX(nearWing[0].wx, nearWing[0].wy);
+    var nearPostPX = projX(nearWing[1].wx, nearWing[1].wy);
+    drawDimArrow(ctx, t, nearConnPX + 2, 0, nearConnPX + 2, LEFT_WALL_H,
+      LEFT_WALL_H.toFixed(0) + "'", '#c0392b', 'right');
+    drawDimArrow(ctx, t, nearPostPX + 2, 0, nearPostPX + 2, RIGHT_POST_H,
+      RIGHT_POST_H.toFixed(0) + "'", '#c0392b', 'right');
+  }
 }
 
 // ===================================================================
