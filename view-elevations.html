@@ -893,8 +893,9 @@ if (hash) {
 }
 
 function updateHash() {
-  window.location.hash = 'pitch=' + parseFloat(pitchSlider.value).toFixed(1) +
+  var hash = '#pitch=' + parseFloat(pitchSlider.value).toFixed(1) +
     '&angle=' + parseFloat(angleSlider.value);
+  history.replaceState(null, '', hash);
 }
 
 pitchSlider.addEventListener('input', function() { update(); updateHash(); });
