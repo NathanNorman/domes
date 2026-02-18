@@ -344,27 +344,31 @@ function drawFrontElevation(pitchDeg) {
 
   var geo = computeGeometry(pitchDeg);
 
-  // Dome geometry
-  var domeCX = 0;
-  var domeCY = 0; // dome center at ground level; dome is a hemisphere sitting on ground
+  // Dome sits on an 8' riser wall
+  var RISER_H = RIGHT_POST_H; // 8'
   var domeR = DOME_R;
+  var domeCX = 0;
+  var domeCY = RISER_H; // dome center at top of riser
+  var domePeak = RISER_H + domeR; // 24.5'
 
-  // Connection point at CONN_ANGLE_DEG above horizontal on dome circle
-  var connAngle = CONN_ANGLE_DEG * DEG2RAD;
-  var connX = domeR * Math.cos(connAngle);
-  var connY = domeR * Math.sin(connAngle);
-  var connHeight = connY; // height above ground
+  // Connection point: wing connects at LEFT_WALL_H (20') above ground
+  // On the dome circle: connY = 20, so sin(angle) = (20 - 8) / 16.5
+  var connHeight = LEFT_WALL_H; // 20'
+  var connSinA = (connHeight - RISER_H) / domeR; // 12/16.5 = 0.727
+  connSinA = Math.min(1, Math.max(-1, connSinA));
+  var connAngleRad = Math.asin(connSinA);
+  var connX = domeR * Math.cos(connAngleRad); // ~11.3'
+  var connY = connHeight; // 20'
 
   // Wing outer edge: post at 8' height, lateral distance ~25' from center
-  // The wing extends along a wall angle; from front, approximate the lateral extent
-  var wingLateralExtent = 25; // feet from center to outer post
+  var wingLateralExtent = 25;
   var wingOuterY = RIGHT_POST_H;
 
   // World bounds
   var xMin = -wingLateralExtent - 5;
   var xMax = wingLateralExtent + 5;
   var yMin = -3;
-  var yMax = domeR + 5;
+  var yMax = domePeak + 3;
 
   var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
 
@@ -378,47 +382,48 @@ function drawFrontElevation(pitchDeg) {
   var gx2 = t.tx(xMax - 1), gy2 = t.ty(-2);
   ctx.fillRect(gx1, gy1, gx2 - gx1, gy2 - gy1);
   ctx.restore();
-
-  // Ground line label
   drawText(ctx, t, 0, -1.5, 'GROUND', { size: 10, color: '#8B7355', weight: '600' });
 
-  // Dome shell (semicircle from 0 to 180 degrees)
+  // --- Riser wall (8' stemwall under dome) ---
   ctx.save();
-  // Fill dome with light blue
+  ctx.fillStyle = 'rgba(180, 180, 170, 0.2)';
+  ctx.fillRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
+  ctx.restore();
+  drawLine(ctx, t, -domeR, 0, -domeR, RISER_H, '#666', 2);
+  drawLine(ctx, t, domeR, 0, domeR, RISER_H, '#666', 2);
+  drawLine(ctx, t, -domeR, RISER_H, domeR, RISER_H, '#666', 1.5);
+  drawText(ctx, t, 0, RISER_H / 2, "RISER WALL (8')", { size: 10, color: '#666', weight: '600' });
+
+  // --- Dome shell (semicircle on top of riser) ---
+  ctx.save();
   drawFilledArc(ctx, t, domeCX, domeCY, domeR, 0, 180, 'rgba(173, 216, 230, 0.15)');
-  // Dome outline
   drawArc(ctx, t, domeCX, domeCY, domeR, 0, 180, '#2c3e50', 2.5);
   ctx.restore();
 
-  // Entry box (centered, 8' wide, 9' tall)
+  // --- Entry box (centered, 8' wide, from ground to ~10') ---
   var entryW = 8;
-  var entryH = 9;
+  var entryH = 10;
   ctx.save();
   ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
-  var ex1 = t.tx(-entryW / 2), ey1 = t.ty(entryH);
-  var ex2 = t.tx(entryW / 2), ey2 = t.ty(0);
-  ctx.fillRect(ex1, ey1, ex2 - ex1, ey2 - ey1);
+  ctx.fillRect(t.tx(-entryW / 2), t.ty(entryH), t.tx(entryW / 2) - t.tx(-entryW / 2), t.ty(0) - t.ty(entryH));
   ctx.restore();
-  // Entry outline
   drawLine(ctx, t, -entryW / 2, 0, -entryW / 2, entryH, '#8B6914', 2);
   drawLine(ctx, t, entryW / 2, 0, entryW / 2, entryH, '#8B6914', 2);
   drawLine(ctx, t, -entryW / 2, entryH, entryW / 2, entryH, '#8B6914', 2);
   drawText(ctx, t, 0, entryH / 2, 'ENTRY', { size: 11, color: '#8B6914', weight: '600' });
 
-  // Right wing roof line: from connection point down to outer post
+  // --- Wing roof lines: from connection point (20') down to outer post (8') ---
+  // Right wing
   drawLine(ctx, t, connX, connY, wingLateralExtent, wingOuterY, '#c0392b', 2.5);
-  // Right wing outer wall (post)
   drawLine(ctx, t, wingLateralExtent, 0, wingLateralExtent, wingOuterY, '#c0392b', 2);
-
   // Left wing (mirror)
   drawLine(ctx, t, -connX, connY, -wingLateralExtent, wingOuterY, '#c0392b', 2.5);
   drawLine(ctx, t, -wingLateralExtent, 0, -wingLateralExtent, wingOuterY, '#c0392b', 2);
 
-  // Wing fill (light red tint)
+  // Wing fill
   ctx.save();
   ctx.globalAlpha = 0.08;
   ctx.fillStyle = '#c0392b';
-  // Right wing
   ctx.beginPath();
   ctx.moveTo(t.tx(connX), t.ty(connY));
   ctx.lineTo(t.tx(wingLateralExtent), t.ty(wingOuterY));
@@ -426,7 +431,6 @@ function drawFrontElevation(pitchDeg) {
   ctx.lineTo(t.tx(connX), t.ty(0));
   ctx.closePath();
   ctx.fill();
-  // Left wing
   ctx.beginPath();
   ctx.moveTo(t.tx(-connX), t.ty(connY));
   ctx.lineTo(t.tx(-wingLateralExtent), t.ty(wingOuterY));
@@ -437,45 +441,43 @@ function drawFrontElevation(pitchDeg) {
   ctx.globalAlpha = 1.0;
   ctx.restore();
 
-  // Connection points (red dots)
+  // Connection points
   drawDot(ctx, t, connX, connY, 6, '#c0392b');
   drawDot(ctx, t, -connX, connY, 6, '#c0392b');
 
   // --- Dimension lines ---
 
-  // Dome peak height
+  // Dome peak height (from ground)
   var dimX = xMax - 3;
-  drawDimArrow(ctx, t, dimX, 0, dimX, domeR, domeR.toFixed(1) + "'", '#2c3e50', 'right');
-  drawText(ctx, t, dimX + 2.5, domeR / 2, 'DOME PEAK', { size: 9, color: '#2c3e50', weight: '600', align: 'left' });
+  drawDimArrow(ctx, t, dimX, 0, dimX, domePeak, domePeak.toFixed(1) + "'", '#2c3e50', 'right');
+  drawText(ctx, t, dimX + 2.5, domePeak - 2, 'PEAK', { size: 9, color: '#2c3e50', weight: '600', align: 'left' });
 
-  // Connection height
+  // Riser height
+  var dimXR = -domeR - 2;
+  drawDimArrow(ctx, t, dimXR, 0, dimXR, RISER_H, RISER_H.toFixed(0) + "'", '#666', 'left');
+  drawText(ctx, t, dimXR - 2.5, RISER_H / 2, 'RISER', { size: 9, color: '#666', weight: '600', align: 'right' });
+
+  // Connection height (from ground)
   var dimX2 = connX + 2;
-  drawDimArrow(ctx, t, dimX2, 0, dimX2, connY, connY.toFixed(1) + "'", '#c0392b', 'right');
+  drawDimArrow(ctx, t, dimX2, 0, dimX2, connY, connY.toFixed(0) + "'", '#c0392b', 'right');
   drawText(ctx, t, dimX2 + 2.5, connY + 1.5, 'CONN', { size: 9, color: '#c0392b', weight: '600', align: 'left' });
 
-  // Post height on right
+  // Post height
   var dimX3 = wingLateralExtent + 2;
   drawDimArrow(ctx, t, dimX3, 0, dimX3, wingOuterY, wingOuterY.toFixed(0) + "'", '#c0392b', 'right');
   drawText(ctx, t, dimX3 + 2.5, wingOuterY / 2, 'POST', { size: 9, color: '#c0392b', weight: '600', align: 'left' });
 
-  // Entry height on left
+  // Entry height
   var dimX4 = -entryW / 2 - 2;
   drawDimArrow(ctx, t, dimX4, 0, dimX4, entryH, entryH.toFixed(0) + "'", '#8B6914', 'left');
 
   // Base diameter
   drawDimArrow(ctx, t, -domeR, -1.8, domeR, -1.8, (domeR * 2).toFixed(0) + "' dia", '#2c3e50');
 
-  // Wing lateral label
-  drawText(ctx, t, (connX + wingLateralExtent) / 2, wingOuterY - 1.5, 'WING ROOF', { size: 10, color: '#c0392b', weight: '600' });
+  // Wing roof label
+  drawText(ctx, t, (connX + wingLateralExtent) / 2, (connY + wingOuterY) / 2 - 1.5, 'WING ROOF', { size: 10, color: '#c0392b', weight: '600' });
 
-  // Pitch angle label on right roof line
-  var roofMidX = (connX + wingLateralExtent) / 2;
-  var roofMidY = connY + (wingOuterY - connY) * ((roofMidX - connX) / (wingLateralExtent - connX));
-  var roofAngle = Math.atan2(connY - wingOuterY, wingLateralExtent - connX) * RAD2DEG;
-  drawText(ctx, t, roofMidX, roofMidY + 1.5, pitchDeg.toFixed(1) + '\u00B0 pitch', {
-    size: 10, color: '#c0392b', weight: '700',
-    rotation: -roofAngle
-  });
+  return { connHeight: connY, connX: connX };
 }
 
 // ===================================================================
@@ -498,16 +500,20 @@ function drawJunctionDetail(pitchDeg) {
 
   var geo = computeGeometry(pitchDeg);
 
-  // Dome geometry (same as front elevation)
+  // Dome geometry — dome sits on 8' riser
+  var RISER_H = RIGHT_POST_H; // 8'
   var domeCX = 0;
-  var domeCY = 0;
+  var domeCY = RISER_H; // dome center at top of riser
   var domeR = DOME_R;
 
-  // Connection point
-  var connAngleDeg = CONN_ANGLE_DEG;
-  var connAngle = connAngleDeg * DEG2RAD;
+  // Connection point at LEFT_WALL_H (20') above ground
+  var connHeight = LEFT_WALL_H;
+  var connSinA = (connHeight - RISER_H) / domeR;
+  connSinA = Math.min(1, Math.max(-1, connSinA));
+  var connAngle = Math.asin(connSinA);
+  var connAngleDeg = connAngle * RAD2DEG;
   var connX = domeR * Math.cos(connAngle);
-  var connY = domeR * Math.sin(connAngle);
+  var connY = connHeight; // 20' above ground
 
   // Zoomed view: center on connection point, show about 10' around it
   var viewR = 8;
