@@ -34,7 +34,7 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     padding: 8px;
     flex: 1 1 500px;
-    max-width: 700px;
+    max-width: 900px;
     min-width: 320px;
   }
   canvas {
@@ -45,7 +45,7 @@
   }
 
   .controls {
-    max-width: 700px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 0 16px 8px;
   }
@@ -128,6 +128,11 @@
     <canvas id="front-elevation" width="1400" height="900"></canvas>
   </div>
   <div class="canvas-wrap">
+    <canvas id="solid-elevation" width="1400" height="900"></canvas>
+  </div>
+</div>
+<div class="canvas-row" style="justify-content: center;">
+  <div class="canvas-wrap" style="max-width: 700px;">
     <canvas id="junction-detail" width="1400" height="900"></canvas>
   </div>
 </div>
@@ -344,8 +349,9 @@ function getCompassLabel(deg) {
 // ===================================================================
 // 360° Elevation
 // ===================================================================
-function drawElevation(pitchDeg, viewAngleDeg) {
-  var canvas = document.getElementById('front-elevation');
+function drawElevation(pitchDeg, viewAngleDeg, opaque) {
+  var canvasId = opaque ? 'solid-elevation' : 'front-elevation';
+  var canvas = document.getElementById(canvasId);
   var s = setupCanvas(canvas);
   var ctx = s.ctx, w = s.w, h = s.h;
 
@@ -353,11 +359,12 @@ function drawElevation(pitchDeg, viewAngleDeg) {
 
   // Title with compass direction
   var compassDir = getCompassLabel(viewAngleDeg);
+  var titlePrefix = opaque ? 'Solid Elevation' : 'Elevation';
   ctx.save();
   ctx.font = 'bold 14px -apple-system, sans-serif';
   ctx.fillStyle = '#2c3e50';
   ctx.textAlign = 'center';
-  ctx.fillText('Elevation \u2014 ' + compassDir + ' (' + viewAngleDeg + '\u00B0)', w / 2, 20);
+  ctx.fillText(titlePrefix + ' \u2014 ' + compassDir + ' (' + viewAngleDeg + '\u00B0)', w / 2, 20);
   ctx.restore();
 
   var geo = computeGeometry(pitchDeg);
@@ -452,9 +459,11 @@ function drawElevation(pitchDeg, viewAngleDeg) {
   // --- Drawing helpers ---
 
   function drawDomeShape() {
+    var riserAlpha = opaque ? 0.85 : 0.2;
+    var shellAlpha = opaque ? 0.85 : 0.15;
     // Riser wall
     ctx.save();
-    ctx.fillStyle = 'rgba(180, 180, 170, 0.2)';
+    ctx.fillStyle = 'rgba(180, 180, 170, ' + riserAlpha + ')';
     ctx.fillRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
     ctx.restore();
     drawLine(ctx, t, -domeR, 0, -domeR, RISER_H, '#666', 2);
@@ -462,7 +471,7 @@ function drawElevation(pitchDeg, viewAngleDeg) {
     drawLine(ctx, t, -domeR, RISER_H, domeR, RISER_H, '#666', 1.5);
     drawText(ctx, t, 0, RISER_H / 2, "RISER (8')", { size: 10, color: '#666', weight: '600' });
     // Dome shell (always a semicircle — rotationally symmetric)
-    drawFilledArc(ctx, t, 0, RISER_H, domeR, 0, 180, 'rgba(173, 216, 230, 0.15)');
+    drawFilledArc(ctx, t, 0, RISER_H, domeR, 0, 180, 'rgba(173, 216, 230, ' + shellAlpha + ')');
     drawArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#2c3e50', 2.5);
   }
 
@@ -479,7 +488,7 @@ function drawElevation(pitchDeg, viewAngleDeg) {
 
     // Filled trapezoid: conn ground → post ground → post roof → conn roof
     ctx.save();
-    ctx.globalAlpha = 0.1;
+    ctx.globalAlpha = opaque ? 0.85 : 0.1;
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(t.tx(connPX), t.ty(0));
@@ -504,8 +513,9 @@ function drawElevation(pitchDeg, viewAngleDeg) {
     var projW = Math.abs(t.tx(entryMaxPX) - t.tx(entryMinPX));
     if (projW < 4) return; // edge-on, skip
 
+    var entryAlpha = opaque ? 0.85 : 0.3;
     ctx.save();
-    ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
+    ctx.fillStyle = 'rgba(210, 180, 140, ' + entryAlpha + ')';
     ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
       t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
     ctx.restore();
@@ -872,7 +882,8 @@ function update() {
   document.getElementById('angle-value').innerHTML = compassDir + ' ' + viewAngleDeg + '&deg;';
   document.getElementById('sum-angle').innerHTML = compassDir + ' (' + viewAngleDeg + '&deg;)';
 
-  drawElevation(pitchDeg, viewAngleDeg);
+  drawElevation(pitchDeg, viewAngleDeg, false);
+  drawElevation(pitchDeg, viewAngleDeg, true);
   var jd = drawJunctionDetail(pitchDeg);
 
   document.getElementById('sum-conn-ht').textContent = jd.connHeight.toFixed(1) + "'";
