@@ -414,8 +414,26 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
     return { wx: -v.wx, wy: v.wy, h: v.h };
   });
 
+  // Full 4-corner wing footprint (for solid view 3D box rendering)
+  var ROOF_OVERHANG = 2; // feet past lower wall
+  // Right wing parallelogram: A-B = back wall (tall), C-D = front edge (short)
+  var rWB_A = { wx: Px, wy: Py };
+  var rWB_B = { wx: Wx, wy: Wy };
+  var rWB_C = { wx: PostX, wy: PostY };
+  var rWB_D = { wx: Px + (PostX - Wx), wy: Py + (PostY - Wy) };
+  // Overhang corners extend past front wall
+  var rWB_C_oh = { wx: PostX + ROOF_OVERHANG * w2DirX, wy: PostY + ROOF_OVERHANG * w2DirY };
+  var rWB_D_oh = { wx: rWB_D.wx + ROOF_OVERHANG * w2DirX, wy: rWB_D.wy + ROOF_OVERHANG * w2DirY };
+  var rightWingBox = { A: rWB_A, B: rWB_B, C: rWB_C, D: rWB_D, C_oh: rWB_C_oh, D_oh: rWB_D_oh };
+  // Left wing: mirror wx
+  var leftWingBox = {
+    A: { wx: -rWB_A.wx, wy: rWB_A.wy }, B: { wx: -rWB_B.wx, wy: rWB_B.wy },
+    C: { wx: -rWB_C.wx, wy: rWB_C.wy }, D: { wx: -rWB_D.wx, wy: rWB_D.wy },
+    C_oh: { wx: -rWB_C_oh.wx, wy: rWB_C_oh.wy }, D_oh: { wx: -rWB_D_oh.wx, wy: rWB_D_oh.wy }
+  };
+
   // Entry box (plan-view footprint)
-  var entryW = 8, entryH = 10, entryD = 5;
+  var entryW = 8, entryH = 8, entryD = 5;
   var entryCorners = [
     { wx: -entryW / 2, wy: -(domeR + entryD) },
     { wx:  entryW / 2, wy: -(domeR + entryD) },
@@ -435,7 +453,7 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
   // Use max distance-from-origin of any vertex as fixed X extent.
   // Prevents scale jitter when wings go edge-on during rotation.
   var maxR = domeR;
-  rightWing.concat(leftWing).forEach(function(v) {
+  [rWB_A, rWB_B, rWB_C, rWB_D, rWB_C_oh, rWB_D_oh].forEach(function(v) {
     maxR = Math.max(maxR, Math.sqrt(v.wx * v.wx + v.wy * v.wy));
   });
   entryCorners.forEach(function(c) {
@@ -503,120 +521,222 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
     }
   }
 
+  // --- Transparent-only drawing helpers ---
+
   function drawWingShape(wing, color) {
-    // Project connection (wing[0]) and post (wing[1])
     var connPX = projX(wing[0].wx, wing[0].wy);
     var postPX = projX(wing[1].wx, wing[1].wy);
     var connH = wing[0].h, postH = wing[1].h;
-    var leftPX = Math.min(connPX, postPX);
-    var rightPX = Math.max(connPX, postPX);
-
-    // Skip if edge-on (too narrow to draw)
-    if (Math.abs(t.tx(rightPX) - t.tx(leftPX)) < 4) return;
-
-    if (opaque) {
-      // Solid wall fill
-      ctx.save();
-      ctx.fillStyle = '#C8B898';
-      ctx.beginPath();
-      ctx.moveTo(t.tx(connPX), t.ty(0));
-      ctx.lineTo(t.tx(postPX), t.ty(0));
-      ctx.lineTo(t.tx(postPX), t.ty(postH));
-      ctx.lineTo(t.tx(connPX), t.ty(connH));
-      ctx.closePath();
-      ctx.fill();
-      // Subtle edge
-      ctx.strokeStyle = '#8A7A5A';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.restore();
-      // Roof line
-      drawLine(ctx, t, connPX, connH, postPX, postH, '#6A5A3A', 2.5);
-    } else {
-      // Transparent fill
-      ctx.save();
-      ctx.globalAlpha = 0.1;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(t.tx(connPX), t.ty(0));
-      ctx.lineTo(t.tx(postPX), t.ty(0));
-      ctx.lineTo(t.tx(postPX), t.ty(postH));
-      ctx.lineTo(t.tx(connPX), t.ty(connH));
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = 1.0;
-      ctx.restore();
-      // Roof line
-      drawLine(ctx, t, connPX, connH, postPX, postH, color, 2.5);
-      // Vertical edges
-      drawLine(ctx, t, connPX, 0, connPX, connH, color, 2);
-      drawLine(ctx, t, postPX, 0, postPX, postH, color, 2);
-      // Connection dot
-      drawDot(ctx, t, connPX, connH, 5, color);
-    }
+    if (Math.abs(t.tx(Math.max(connPX, postPX)) - t.tx(Math.min(connPX, postPX))) < 4) return;
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(t.tx(connPX), t.ty(0));
+    ctx.lineTo(t.tx(postPX), t.ty(0));
+    ctx.lineTo(t.tx(postPX), t.ty(postH));
+    ctx.lineTo(t.tx(connPX), t.ty(connH));
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+    ctx.restore();
+    drawLine(ctx, t, connPX, connH, postPX, postH, color, 2.5);
+    drawLine(ctx, t, connPX, 0, connPX, connH, color, 2);
+    drawLine(ctx, t, postPX, 0, postPX, postH, color, 2);
+    drawDot(ctx, t, connPX, connH, 5, color);
   }
 
   function drawEntryShape() {
     var projW = Math.abs(t.tx(entryMaxPX) - t.tx(entryMinPX));
-    if (projW < 4) return; // edge-on, skip
-
-    if (opaque) {
-      ctx.save();
-      ctx.fillStyle = '#C8B898';
-      ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
-        t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
-      ctx.strokeStyle = '#8A7A5A';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(t.tx(entryMinPX), t.ty(entryH),
-        t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
-      ctx.restore();
-      // Roof line
-      drawLine(ctx, t, entryMinPX, entryH, entryMaxPX, entryH, '#6A5A3A', 2);
-    } else {
-      ctx.save();
-      ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
-      ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
-        t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
-      ctx.restore();
-      drawLine(ctx, t, entryMinPX, 0, entryMinPX, entryH, '#8B6914', 2);
-      drawLine(ctx, t, entryMaxPX, 0, entryMaxPX, entryH, '#8B6914', 2);
-      drawLine(ctx, t, entryMinPX, entryH, entryMaxPX, entryH, '#8B6914', 2);
-      if (projW > 30)
-        drawText(ctx, t, (entryMinPX + entryMaxPX) / 2, entryH / 2, 'ENTRY',
-          { size: 11, color: '#8B6914', weight: '600' });
-    }
+    if (projW < 4) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
+    ctx.fillRect(t.tx(entryMinPX), t.ty(entryH),
+      t.tx(entryMaxPX) - t.tx(entryMinPX), t.ty(0) - t.ty(entryH));
+    ctx.restore();
+    drawLine(ctx, t, entryMinPX, 0, entryMinPX, entryH, '#8B6914', 2);
+    drawLine(ctx, t, entryMaxPX, 0, entryMaxPX, entryH, '#8B6914', 2);
+    drawLine(ctx, t, entryMinPX, entryH, entryMaxPX, entryH, '#8B6914', 2);
+    if (projW > 30)
+      drawText(ctx, t, (entryMinPX + entryMaxPX) / 2, entryH / 2, 'ENTRY',
+        { size: 11, color: '#8B6914', weight: '600' });
   }
 
-  // --- Depth-sorted drawing (back-to-front) ---
-  var elements = [
-    { type: 'dome',  avgDepth: 0 },
-    { type: 'right', avgDepth: rightAvgD },
-    { type: 'left',  avgDepth: leftAvgD },
-    { type: 'entry', avgDepth: entryAvgD }
-  ];
-  elements.sort(function(a, b) { return b.avgDepth - a.avgDepth; });
+  // --- Solid view: face-by-face 3D rendering ---
 
-  elements.forEach(function(el) {
-    switch (el.type) {
-      case 'dome':  drawDomeShape(); break;
-      case 'right': drawWingShape(rightWing, '#c0392b'); break;
-      case 'left':  drawWingShape(leftWing, '#c0392b'); break;
-      case 'entry': drawEntryShape(); break;
-    }
-  });
+  function outwardNormal(P1, P2, cx, cy) {
+    var dx = P2.wx - P1.wx, dy = P2.wy - P1.wy;
+    var nx = -dy, ny = dx;
+    var midx = (P1.wx + P2.wx) / 2 - cx;
+    var midy = (P1.wy + P2.wy) / 2 - cy;
+    if (nx * midx + ny * midy >= 0) return { x: nx, y: ny };
+    return { x: dy, y: -dx };
+  }
 
-  // --- Dimension lines (transparent view only) ---
-  if (!opaque) {
+  function collectWingFaces(box, faces) {
+    var A = box.A, B = box.B, C = box.C, D = box.D;
+    var C_oh = box.C_oh, D_oh = box.D_oh;
+    var cx = (A.wx + B.wx + C.wx + D.wx) / 4;
+    var cy = (A.wy + B.wy + C.wy + D.wy) / 4;
+    var tvx = sinA, tvy = -cosA; // toward-viewer direction
+
+    var wallDefs = [
+      { p1: A, p2: B, h1: LEFT_WALL_H, h2: LEFT_WALL_H, color: '#B8A888' },  // back wall (tall)
+      { p1: B, p2: C, h1: LEFT_WALL_H, h2: RIGHT_POST_H, color: '#A89878' }, // far side
+      { p1: C, p2: D, h1: RIGHT_POST_H, h2: RIGHT_POST_H, color: '#C8B898' }, // front wall (short)
+      { p1: D, p2: A, h1: RIGHT_POST_H, h2: LEFT_WALL_H, color: '#A89878' }  // near side
+    ];
+
+    wallDefs.forEach(function(wd) {
+      var n = outwardNormal(wd.p1, wd.p2, cx, cy);
+      if (n.x * tvx + n.y * tvy <= 0) return; // back-facing, skip
+      var p1x = projX(wd.p1.wx, wd.p1.wy);
+      var p2x = projX(wd.p2.wx, wd.p2.wy);
+      if (Math.abs(t.tx(p1x) - t.tx(p2x)) < 2) return; // edge-on
+      var d = (depthOf(wd.p1.wx, wd.p1.wy) + depthOf(wd.p2.wx, wd.p2.wy)) / 2;
+      faces.push({
+        depth: d,
+        draw: function() {
+          ctx.save();
+          ctx.fillStyle = wd.color;
+          ctx.beginPath();
+          ctx.moveTo(t.tx(p1x), t.ty(0));
+          ctx.lineTo(t.tx(p2x), t.ty(0));
+          ctx.lineTo(t.tx(p2x), t.ty(wd.h2));
+          ctx.lineTo(t.tx(p1x), t.ty(wd.h1));
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#6A5A3A';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+    });
+
+    // Roof face with overhang
+    var pA = projX(A.wx, A.wy), pB = projX(B.wx, B.wy);
+    var pC_oh = projX(C_oh.wx, C_oh.wy), pD_oh = projX(D_oh.wx, D_oh.wy);
+    var roofD = (depthOf(A.wx, A.wy) + depthOf(B.wx, B.wy) +
+                 depthOf(C_oh.wx, C_oh.wy) + depthOf(D_oh.wx, D_oh.wy)) / 4;
+    faces.push({
+      depth: roofD,
+      draw: function() {
+        ctx.save();
+        ctx.fillStyle = '#8B7355';
+        ctx.beginPath();
+        ctx.moveTo(t.tx(pA), t.ty(LEFT_WALL_H));
+        ctx.lineTo(t.tx(pB), t.ty(LEFT_WALL_H));
+        ctx.lineTo(t.tx(pC_oh), t.ty(RIGHT_POST_H));
+        ctx.lineTo(t.tx(pD_oh), t.ty(RIGHT_POST_H));
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#6A5A3A';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
+  }
+
+  function collectEntryFaces(faces) {
+    var corners = entryCorners; // [far-left, far-right, near-right, near-left]
+    var cx = 0, cy = -(domeR + entryD / 2);
+    var tvx = sinA, tvy = -cosA;
+
+    var wallPairs = [
+      { p1: corners[0], p2: corners[1], color: '#C8B898' }, // front (far from dome)
+      { p1: corners[1], p2: corners[2], color: '#A89878' }, // right side
+      { p1: corners[2], p2: corners[3], color: '#C8B898' }, // back (near dome)
+      { p1: corners[3], p2: corners[0], color: '#A89878' }  // left side
+    ];
+
+    wallPairs.forEach(function(wp) {
+      var n = outwardNormal(wp.p1, wp.p2, cx, cy);
+      if (n.x * tvx + n.y * tvy <= 0) return;
+      var p1x = projX(wp.p1.wx, wp.p1.wy);
+      var p2x = projX(wp.p2.wx, wp.p2.wy);
+      if (Math.abs(t.tx(p1x) - t.tx(p2x)) < 2) return;
+      var d = (depthOf(wp.p1.wx, wp.p1.wy) + depthOf(wp.p2.wx, wp.p2.wy)) / 2;
+      faces.push({
+        depth: d,
+        draw: function() {
+          ctx.save();
+          ctx.fillStyle = wp.color;
+          ctx.beginPath();
+          ctx.moveTo(t.tx(p1x), t.ty(0));
+          ctx.lineTo(t.tx(p2x), t.ty(0));
+          ctx.lineTo(t.tx(p2x), t.ty(entryH));
+          ctx.lineTo(t.tx(p1x), t.ty(entryH));
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#6A5A3A';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+    });
+
+    // Entry roof (flat at entryH)
+    var pts = corners.map(function(c) { return projX(c.wx, c.wy); });
+    var roofD = corners.reduce(function(s, c) { return s + depthOf(c.wx, c.wy); }, 0) / 4;
+    faces.push({
+      depth: roofD,
+      draw: function() {
+        ctx.save();
+        ctx.fillStyle = '#8B7355';
+        ctx.beginPath();
+        for (var i = 0; i < pts.length; i++) {
+          if (i === 0) ctx.moveTo(t.tx(pts[i]), t.ty(entryH));
+          else ctx.lineTo(t.tx(pts[i]), t.ty(entryH));
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#6A5A3A';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
+  }
+
+  // --- Depth-sorted drawing ---
+  if (opaque) {
+    // Face-by-face rendering for proper occlusion
+    var allFaces = [];
+    // Dome as single element at depth 0 (opaque fill covers back elements)
+    allFaces.push({ depth: 0, draw: function() { drawDomeShape(); } });
+    collectWingFaces(rightWingBox, allFaces);
+    collectWingFaces(leftWingBox, allFaces);
+    collectEntryFaces(allFaces);
+    allFaces.sort(function(a, b) { return b.depth - a.depth; });
+    allFaces.forEach(function(f) { f.draw(); });
+  } else {
+    // Element-level sorting for transparent view
+    var elements = [
+      { type: 'dome',  avgDepth: 0 },
+      { type: 'right', avgDepth: rightAvgD },
+      { type: 'left',  avgDepth: leftAvgD },
+      { type: 'entry', avgDepth: entryAvgD }
+    ];
+    elements.sort(function(a, b) { return b.avgDepth - a.avgDepth; });
+    elements.forEach(function(el) {
+      switch (el.type) {
+        case 'dome':  drawDomeShape(); break;
+        case 'right': drawWingShape(rightWing, '#c0392b'); break;
+        case 'left':  drawWingShape(leftWing, '#c0392b'); break;
+        case 'entry': drawEntryShape(); break;
+      }
+    });
+
+    // Dimension lines
     var dimX = xMax - 3;
     drawDimArrow(ctx, t, dimX, 0, dimX, domePeak, domePeak.toFixed(1) + "'", '#2c3e50', 'right');
     drawText(ctx, t, dimX + 2.5, domePeak - 2, 'PEAK', { size: 9, color: '#2c3e50', weight: '600', align: 'left' });
-
     var dimXR = -domeR - 2;
     drawDimArrow(ctx, t, dimXR, 0, dimXR, RISER_H, RISER_H.toFixed(0) + "'", '#666', 'left');
-
     drawDimArrow(ctx, t, -domeR, -1.8, domeR, -1.8, (domeR * 2).toFixed(0) + "' dia", '#2c3e50');
-
-    // Wing connection height (use nearest wing's connection)
     var nearWing = (rightAvgD < leftAvgD) ? rightWing : leftWing;
     var nearConnPX = projX(nearWing[0].wx, nearWing[0].wy);
     var nearPostPX = projX(nearWing[1].wx, nearWing[1].wy);
