@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hippie Hideout — Roof Pitch Geometry Explorer</title>
+<title>Hippie Hideout — Wing Cross-Section</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -138,16 +138,13 @@
 <body>
 
 <header>
-  <h1>Hippie Hideout — Roof Pitch Geometry Explorer</h1>
-  <p>Interactive cross-section and floor plan driven by roof pitch angle</p>
+  <h1>Hippie Hideout — Wing Cross-Section</h1>
+  <p>Side view showing wall heights, rafter length, and wing dimensions by roof pitch</p>
 </header>
 
 <div class="canvas-row">
-  <div class="canvas-wrap">
+  <div class="canvas-wrap" style="max-width: 900px;">
     <canvas id="cross-section" width="1400" height="800"></canvas>
-  </div>
-  <div class="canvas-wrap">
-    <canvas id="floor-plan" width="1400" height="1000"></canvas>
   </div>
 </div>
 
@@ -170,9 +167,7 @@
 </div>
 
 <div class="actions">
-  <button onclick="exportPNG('cross-section')">Export Cross-Section</button>
-  <button onclick="exportPNG('floor-plan')">Export Floor Plan</button>
-  <button onclick="exportBoth()">Export Both</button>
+  <button onclick="exportPNG('cross-section')">Export PNG</button>
   <button onclick="shareLink()">Copy Share Link</button>
 </div>
 
@@ -447,214 +442,6 @@ function drawCrossSection(g) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Floor Plan Renderer
-// ═══════════════════════════════════════════════════════════════
-function drawFloorPlan(g) {
-  const canvas = document.getElementById('floor-plan');
-  const { ctx, w, h } = setupCanvas(canvas);
-
-  const xMin = -52, xMax = 52;
-  const yMin = -42, yMax = 22;
-  const t = makeTransform(w, h, xMin, xMax, yMin, yMax);
-
-  // Background
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, w, h);
-
-  // Grid
-  drawGrid(ctx, t, xMin, xMax, yMin, yMax, 5, 1);
-
-  const { wallX, rightSection } = g;
-  const r = DOME_R;
-  const wallAngle = WALL_ANGLE_DEG * DEG2RAD;
-  const connRad = CONN_ANGLE_DEG * DEG2RAD;
-
-  // --- DOME ---
-  ctx.beginPath();
-  for (let i = 0; i <= 500; i++) {
-    const a = (2 * Math.PI * i) / 500;
-    const px = r * Math.cos(a), py = r * Math.sin(a);
-    if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
-    else ctx.lineTo(t.tx(px), t.ty(py));
-  }
-  ctx.closePath();
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  drawText(ctx, t, 0, 0, 'B', { color: '#333', size: 16 });
-
-  // --- RIGHT WING ---
-  const Px = r * Math.cos(connRad);
-  const Py = r * Math.sin(connRad);
-  drawDot(ctx, t, Px, Py, 5);
-
-  // 30' back wall at angle
-  const weX = Px + BACK_WALL_LEN * Math.cos(wallAngle);
-  const weY = Py + BACK_WALL_LEN * Math.sin(wallAngle);
-  drawLine(ctx, t, Px, Py, weX, weY, '#000', 2);
-
-  // Wing wall perpendicular to back wall
-  const w2Angle = wallAngle - Math.PI / 2;
-  const w2DirX = Math.cos(w2Angle), w2DirY = Math.sin(w2Angle);
-  const w2eX = weX + wallX * w2DirX;
-  const w2eY = weY + wallX * w2DirY;
-  drawLine(ctx, t, weX, weY, w2eX, w2eY, '#000', 2);
-  drawDot(ctx, t, weX, weY, 4);
-
-  // Extension to post
-  const peX = w2eX + rightSection * w2DirX;
-  const peY = w2eY + rightSection * w2DirY;
-  drawLine(ctx, t, w2eX, w2eY, peX, peY, '#000', 2);
-  drawSquare(ctx, t, peX, peY, 8);
-  drawDot(ctx, t, w2eX, w2eY, 4);
-
-  // Wall back to dome from w2e (quadratic intersection)
-  const w3Angle = w2Angle - Math.PI / 2;
-  const w3DirX = Math.cos(w3Angle), w3DirY = Math.sin(w3Angle);
-  const aCoef = 1.0;
-  const bCoef = 2 * (w2eX * w3DirX + w2eY * w3DirY);
-  const cCoef = w2eX * w2eX + w2eY * w2eY - r * r;
-  const disc = bCoef * bCoef - 4 * aCoef * cCoef;
-  let w3eX, w3eY, tHit;
-  if (disc >= 0) {
-    tHit = (-bCoef - Math.sqrt(disc)) / (2 * aCoef);
-    w3eX = w2eX + tHit * w3DirX;
-    w3eY = w2eY + tHit * w3DirY;
-    drawLine(ctx, t, w2eX, w2eY, w3eX, w3eY, '#000', 2);
-    drawDot(ctx, t, w3eX, w3eY, 4);
-  }
-
-  // Right wing dimension labels
-  const perpX = Math.sin(wallAngle), perpY = -Math.cos(wallAngle);
-  const wmX = (Px + weX) / 2, wmY = (Py + weY) / 2;
-  drawText(ctx, t, wmX + 1.5 * perpX, wmY + 1.5 * perpY, "30'",
-    { color: '#333', size: 11, rotation: WALL_ANGLE_DEG });
-
-  const perp2X = Math.sin(w2Angle), perp2Y = -Math.cos(w2Angle);
-  const w2mX = (weX + w2eX) / 2, w2mY = (weY + w2eY) / 2;
-  drawText(ctx, t, w2mX + 1.5 * perp2X, w2mY + 1.5 * perp2Y, `${wallX.toFixed(1)}'`,
-    { color: '#333', size: 11, rotation: w2Angle * 180 / Math.PI });
-
-  const emX = (w2eX + peX) / 2, emY = (w2eY + peY) / 2;
-  drawText(ctx, t, emX + 1.5 * perp2X, emY + 1.5 * perp2Y, `${rightSection.toFixed(1)}'`,
-    { color: '#333', size: 11, rotation: w2Angle * 180 / Math.PI });
-
-  // Height labels
-  drawText(ctx, t, weX + 1.5, weY + 1.5, "20' high", { color: '#666', size: 9 });
-  drawText(ctx, t, w2eX + 1.5, w2eY + 1.5, "12' high", { color: '#666', size: 9 });
-  drawText(ctx, t, peX - 1.5, peY - 1.5, "Post (8')", { color: '#333', size: 9 });
-
-  if (disc >= 0) {
-    const perp3X = Math.sin(w3Angle), perp3Y = -Math.cos(w3Angle);
-    const w3mX = (w2eX + w3eX) / 2, w3mY = (w2eY + w3eY) / 2;
-    drawText(ctx, t, w3mX + 2 * perp3X, w3mY + 2 * perp3Y, `${tHit.toFixed(1)}'`,
-      { color: '#333', size: 11, rotation: w3Angle * 180 / Math.PI + 180 });
-  }
-
-  // --- LEFT WING (mirror over Y axis) ---
-  const mirror = (x, y) => [-x, y];
-
-  const [PLx, PLy] = mirror(Px, Py);
-  drawDot(ctx, t, PLx, PLy, 5);
-
-  const [weLx, weLy] = mirror(weX, weY);
-  drawLine(ctx, t, PLx, PLy, weLx, weLy, '#000', 2);
-
-  const [w2eLx, w2eLy] = mirror(w2eX, w2eY);
-  drawLine(ctx, t, weLx, weLy, w2eLx, w2eLy, '#000', 2);
-  drawDot(ctx, t, weLx, weLy, 4);
-
-  const [peLx, peLy] = mirror(peX, peY);
-  drawLine(ctx, t, w2eLx, w2eLy, peLx, peLy, '#000', 2);
-  drawSquare(ctx, t, peLx, peLy, 8);
-  drawDot(ctx, t, w2eLx, w2eLy, 4);
-
-  if (disc >= 0) {
-    const [w3eLx, w3eLy] = mirror(w3eX, w3eY);
-    drawLine(ctx, t, w2eLx, w2eLy, w3eLx, w3eLy, '#000', 2);
-    drawDot(ctx, t, w3eLx, w3eLy, 4);
-
-    // Left bottom wall label
-    const perp3X = Math.sin(w3Angle), perp3Y = -Math.cos(w3Angle);
-    const [w3mLx, w3mLy] = mirror((w2eX + w3eX) / 2, (w2eY + w3eY) / 2);
-    drawText(ctx, t, w3mLx - 2 * perp3X, w3mLy + 2 * perp3Y, `${tHit.toFixed(1)}'`,
-      { color: '#333', size: 11, rotation: -(w3Angle * 180 / Math.PI + 180) });
-  }
-
-  // Left wing dimension labels
-  const [wmLx, wmLy] = mirror(wmX, wmY);
-  drawText(ctx, t, wmLx - 1.5 * perpX, wmLy + 1.5 * perpY, "30'",
-    { color: '#333', size: 11, rotation: -WALL_ANGLE_DEG });
-
-  const [w2mLx, w2mLy] = mirror(w2mX, w2mY);
-  drawText(ctx, t, w2mLx - 1.5 * perp2X, w2mLy + 1.5 * perp2Y, `${wallX.toFixed(1)}'`,
-    { color: '#333', size: 11, rotation: -(w2Angle * 180 / Math.PI) });
-
-  const [emLx, emLy] = mirror(emX, emY);
-  drawText(ctx, t, emLx - 1.5 * perp2X, emLy + 1.5 * perp2Y, `${rightSection.toFixed(1)}'`,
-    { color: '#333', size: 11, rotation: -(w2Angle * 180 / Math.PI) });
-
-  drawText(ctx, t, weLx - 1.5, weLy + 1.5, "20' high", { color: '#666', size: 9, align: 'right' });
-  drawText(ctx, t, w2eLx - 1.5, w2eLy + 1.5, "12' high", { color: '#666', size: 9, align: 'right' });
-  drawText(ctx, t, peLx + 1.5, peLy - 1.5, "Post (8')", { color: '#333', size: 9 });
-
-  // --- FRONT RECTANGLE + ARC ---
-  const halfWidth = 4.0;
-  const yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
-  const leftInt = [-halfWidth, yInt];
-  const rightInt = [halfWidth, yInt];
-
-  drawLine(ctx, t, leftInt[0], leftInt[1], rightInt[0], rightInt[1], '#000', 2);
-  drawDot(ctx, t, leftInt[0], leftInt[1], 5);
-  drawDot(ctx, t, rightInt[0], rightInt[1], 5);
-
-  const leftBot = [leftInt[0], leftInt[1] - 5];
-  const rightBot = [rightInt[0], rightInt[1] - 5];
-  drawLine(ctx, t, leftInt[0], leftInt[1], leftBot[0], leftBot[1], '#000', 2);
-  drawLine(ctx, t, rightInt[0], rightInt[1], rightBot[0], rightBot[1], '#000', 2);
-  drawLine(ctx, t, leftBot[0], leftBot[1], rightBot[0], rightBot[1], '#000', 2);
-
-  // Front arc between posts
-  const botY = leftBot[1];
-  const arcCy = (peX * peX + peY * peY - botY * botY) / (2 * (peY - botY));
-  const arcRad = Math.abs(arcCy - botY);
-  const aRight = Math.atan2(peY - arcCy, peX);
-  const aLeft = Math.atan2(peLy - arcCy, peLx);
-
-  ctx.beginPath();
-  for (let i = 0; i <= 200; i++) {
-    const a = aRight + (aLeft - aRight) * (i / 200);
-    const ax = arcRad * Math.cos(a);
-    const ay = arcCy + arcRad * Math.sin(a);
-    if (i === 0) ctx.moveTo(t.tx(ax), t.ty(ay));
-    else ctx.lineTo(t.tx(ax), t.ty(ay));
-  }
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = 0.5;
-  ctx.stroke();
-  ctx.globalAlpha = 1.0;
-
-  // Title
-  ctx.font = 'bold 14px -apple-system, sans-serif';
-  ctx.fillStyle = '#333';
-  ctx.textAlign = 'center';
-  ctx.fillText('Floor Plan (Top Down)', w / 2, 20);
-
-  // Axis labels
-  ctx.font = '10px -apple-system, sans-serif';
-  ctx.fillStyle = '#888';
-  ctx.textAlign = 'center';
-  ctx.fillText('Feet', w / 2, h - 4);
-  ctx.save();
-  ctx.translate(12, h / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Feet', 0, 0);
-  ctx.restore();
-}
-
-// ═══════════════════════════════════════════════════════════════
 // Update Loop
 // ═══════════════════════════════════════════════════════════════
 function update() {
@@ -688,7 +475,6 @@ function update() {
   }
 
   drawCrossSection(g);
-  drawFloorPlan(g);
 
   // Update URL hash
   history.replaceState(null, '', '#pitch=' + pitchDeg.toFixed(1));
@@ -704,27 +490,6 @@ function exportPNG(canvasId) {
     const a = document.createElement('a');
     a.href = url;
     a.download = canvasId + '-' + slider.value + 'deg.png';
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-}
-
-function exportBoth() {
-  const cs = document.getElementById('cross-section');
-  const fp = document.getElementById('floor-plan');
-  const combined = document.createElement('canvas');
-  combined.width = cs.width + fp.width + 20;
-  combined.height = Math.max(cs.height, fp.height);
-  const ctx = combined.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, combined.width, combined.height);
-  ctx.drawImage(cs, 0, 0);
-  ctx.drawImage(fp, cs.width + 20, 0);
-  combined.toBlob(function(blob) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'hippie-hideout-' + slider.value + 'deg.png';
     a.click();
     URL.revokeObjectURL(url);
   });

@@ -118,10 +118,18 @@
 <div class="views">
   <div class="view-card">
     <div class="view-title">
-      <span>Cross-Section + Floor Plan</span>
+      <span>Wing Cross-Section</span>
       <a href="geometry-explorer.html" target="_blank">Open standalone</a>
     </div>
     <iframe src="geometry-explorer.html" id="frame-explorer"></iframe>
+  </div>
+
+  <div class="view-card">
+    <div class="view-title">
+      <span>Floor Plan (Top Down)</span>
+      <a href="view-floor-plan.html" target="_blank">Open standalone</a>
+    </div>
+    <iframe src="view-floor-plan.html" id="frame-floorplan"></iframe>
   </div>
 
   <div class="view-card">
@@ -148,13 +156,6 @@
     <iframe src="view-roof-panel.html" id="frame-panel"></iframe>
   </div>
 
-  <div class="view-card">
-    <div class="view-title">
-      <span>Pitch Comparison (A vs B)</span>
-      <a href="view-comparison.html" target="_blank">Open standalone</a>
-    </div>
-    <iframe src="view-comparison.html" id="frame-comparison"></iframe>
-  </div>
 </div>
 
 <script>
@@ -163,10 +164,10 @@ var label = document.getElementById('master-value');
 
 var frames = [
   document.getElementById('frame-explorer'),
+  document.getElementById('frame-floorplan'),
   document.getElementById('frame-height'),
   document.getElementById('frame-elevations'),
-  document.getElementById('frame-panel'),
-  document.getElementById('frame-comparison')
+  document.getElementById('frame-panel')
 ];
 
 function broadcast() {

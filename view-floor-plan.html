@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hippie Hideout — Floor Plan (Top Down)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+    min-height: 100vh;
+  }
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 16px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.4em; font-weight: 600; letter-spacing: 0.02em; }
+  header p { font-size: 0.85em; opacity: 0.7; margin-top: 4px; }
+
+  .canvas-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .canvas-wrap {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 8px;
+    flex: 1 1 600px;
+    max-width: 900px;
+    min-width: 320px;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .controls {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 16px 8px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .slider-row label {
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: #2c3e50;
+    height: 6px;
+  }
+  .slider-row .value {
+    font-weight: 700;
+    font-size: 1.1em;
+    min-width: 42px;
+    text-align: right;
+    color: #c0392b;
+  }
+
+  .summary {
+    max-width: 900px;
+    margin: 8px auto;
+    padding: 0 16px;
+  }
+  .summary-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 12px 20px;
+    justify-content: center;
+  }
+  .summary-item {
+    text-align: center;
+    min-width: 100px;
+  }
+  .summary-item .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-item .val { font-size: 1.3em; font-weight: 700; color: #2c3e50; }
+
+  .actions {
+    text-align: center;
+    padding: 12px;
+  }
+  .actions button {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    cursor: pointer;
+    margin: 0 4px;
+    transition: background 0.2s;
+  }
+  .actions button:hover { background: #34495e; }
+
+  @media (max-width: 768px) {
+    .canvas-row { flex-direction: column; align-items: center; padding: 8px; gap: 8px; }
+    .canvas-wrap { max-width: 100%; flex: 0 0 auto; }
+    header h1 { font-size: 1.1em; }
+    header { padding: 10px 16px; }
+    .controls { padding: 0 8px 4px; }
+    .summary { padding: 0 8px; }
+    .summary-grid { padding: 8px 12px; gap: 8px; }
+    .summary-item .val { font-size: 1.1em; }
+    .actions { padding: 8px; }
+    .actions button { padding: 6px 12px; font-size: 0.8em; }
+  }
+  @media print {
+    header { background: white; color: black; }
+    .controls, .actions { display: none; }
+    .canvas-wrap { box-shadow: none; border: 1px solid #ccc; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hippie Hideout — Floor Plan (Top Down)</h1>
+  <p>Dome and wing footprint with dimensions driven by roof pitch</p>
+</header>
+
+<div class="canvas-row">
+  <div class="canvas-wrap">
+    <canvas id="floor-plan" width="1400" height="1000"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="slider-row">
+    <label for="pitch-slider">Roof Pitch:</label>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
+    <span class="value" id="pitch-value">20.0&deg;</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-grid">
+    <div class="summary-item"><div class="label">Wing Room</div><div class="val" id="sum-wing">--</div></div>
+    <div class="summary-item"><div class="label">Extension</div><div class="val" id="sum-ext">--</div></div>
+    <div class="summary-item"><div class="label">Total Span</div><div class="val" id="sum-span">--</div></div>
+    <div class="summary-item"><div class="label">Bottom Wall</div><div class="val" id="sum-bottom">--</div></div>
+    <div class="summary-item"><div class="label">Pitch</div><div class="val" id="sum-pitch">--</div></div>
+  </div>
+</div>
+
+<div class="actions">
+  <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="shareLink()">Copy Share Link</button>
+</div>
+
+<script>
+// ===================================================================
+// Constants
+// ===================================================================
+var LEFT_WALL_H = 20.0;
+var RIGHT_POST_H = 8.0;
+var ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H;
+var INTERIOR_WALL_H = 12.0;
+var BACK_WALL_LEN = 30.0;
+var DOME_R = 16.5;
+var CONN_ANGLE_DEG = 20.0;
+var WALL_ANGLE_DEG = -25.0;
+var DEG2RAD = Math.PI / 180;
+
+// ===================================================================
+// Geometry Engine
+// ===================================================================
+function computeGeometry(pitchDeg) {
+  var rad = pitchDeg * DEG2RAD;
+  var horizSpan = ROOF_DROP / Math.tan(rad);
+  var wallX = (LEFT_WALL_H - INTERIOR_WALL_H) / Math.tan(rad);
+  var rafterLen = ROOF_DROP / Math.sin(rad);
+  var rightSection = horizSpan - wallX;
+  return { pitchDeg: pitchDeg, rad: rad, horizSpan: horizSpan, wallX: wallX, rafterLen: rafterLen, rightSection: rightSection };
+}
+
+// ===================================================================
+// Drawing Utilities
+// ===================================================================
+function setupCanvas(canvas) {
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx: ctx, w: rect.width, h: rect.height };
+}
+
+function makeTransform(w, h, xMin, xMax, yMin, yMax) {
+  var padX = 0.05 * w, padY = 0.05 * h;
+  var drawW = w - 2 * padX;
+  var drawH = h - 2 * padY;
+  var scaleX = drawW / (xMax - xMin);
+  var scaleY = drawH / (yMax - yMin);
+  var scale = Math.min(scaleX, scaleY);
+  var offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
+  var offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
+  return {
+    tx: function(x) { return offsetX + (x - xMin) * scale; },
+    ty: function(y) { return h - (offsetY + (y - yMin) * scale); },
+    scale: scale
+  };
+}
+
+function drawLine(ctx, t, x1, y1, x2, y2, color, lw) {
+  ctx.beginPath();
+  ctx.moveTo(t.tx(x1), t.ty(y1));
+  ctx.lineTo(t.tx(x2), t.ty(y2));
+  ctx.strokeStyle = color || '#000';
+  ctx.lineWidth = lw || 2;
+  ctx.stroke();
+}
+
+function drawDot(ctx, t, x, y, r, color) {
+  ctx.beginPath();
+  ctx.arc(t.tx(x), t.ty(y), r || 4, 0, 2 * Math.PI);
+  ctx.fillStyle = color || '#000';
+  ctx.fill();
+}
+
+function drawSquare(ctx, t, x, y, size, color) {
+  var s = size || 6;
+  ctx.fillStyle = color || '#000';
+  ctx.fillRect(t.tx(x) - s/2, t.ty(y) - s/2, s, s);
+}
+
+function drawText(ctx, t, x, y, text, opts) {
+  opts = opts || {};
+  ctx.save();
+  ctx.font = (opts.weight || 'bold') + ' ' + (opts.size || 12) + 'px -apple-system, sans-serif';
+  ctx.fillStyle = opts.color || '#333';
+  ctx.textAlign = opts.align || 'center';
+  ctx.textBaseline = opts.baseline || 'middle';
+  var sx = t.tx(x), sy = t.ty(y);
+  if (opts.rotation) {
+    ctx.translate(sx, sy);
+    ctx.rotate(-opts.rotation * DEG2RAD);
+    ctx.fillText(text, 0, 0);
+  } else {
+    ctx.fillText(text, sx, sy);
+  }
+  ctx.restore();
+}
+
+function drawGrid(ctx, t, xMin, xMax, yMin, yMax, majorStep, minorStep) {
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 0.3;
+  ctx.globalAlpha = 0.4;
+  for (var x = Math.ceil(xMin / minorStep) * minorStep; x <= xMax; x += minorStep) {
+    ctx.beginPath(); ctx.moveTo(t.tx(x), t.ty(yMin)); ctx.lineTo(t.tx(x), t.ty(yMax)); ctx.stroke();
+  }
+  for (var y = Math.ceil(yMin / minorStep) * minorStep; y <= yMax; y += minorStep) {
+    ctx.beginPath(); ctx.moveTo(t.tx(xMin), t.ty(y)); ctx.lineTo(t.tx(xMax), t.ty(y)); ctx.stroke();
+  }
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 0.5;
+  ctx.globalAlpha = 0.5;
+  for (var x2 = Math.ceil(xMin / majorStep) * majorStep; x2 <= xMax; x2 += majorStep) {
+    ctx.beginPath(); ctx.moveTo(t.tx(x2), t.ty(yMin)); ctx.lineTo(t.tx(x2), t.ty(yMax)); ctx.stroke();
+  }
+  for (var y2 = Math.ceil(yMin / majorStep) * majorStep; y2 <= yMax; y2 += majorStep) {
+    ctx.beginPath(); ctx.moveTo(t.tx(xMin), t.ty(y2)); ctx.lineTo(t.tx(xMax), t.ty(y2)); ctx.stroke();
+  }
+  ctx.globalAlpha = 1.0;
+}
+
+// ===================================================================
+// Floor Plan Renderer
+// ===================================================================
+function drawFloorPlan(g) {
+  var canvas = document.getElementById('floor-plan');
+  var setup = setupCanvas(canvas);
+  var ctx = setup.ctx, w = setup.w, h = setup.h;
+
+  var xMin = -52, xMax = 52;
+  var yMin = -42, yMax = 22;
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  drawGrid(ctx, t, xMin, xMax, yMin, yMax, 5, 1);
+
+  var wallX = g.wallX, rightSection = g.rightSection;
+  var r = DOME_R;
+  var wallAngle = WALL_ANGLE_DEG * DEG2RAD;
+  var connRad = CONN_ANGLE_DEG * DEG2RAD;
+
+  // --- DOME ---
+  ctx.beginPath();
+  for (var i = 0; i <= 500; i++) {
+    var a = (2 * Math.PI * i) / 500;
+    var px = r * Math.cos(a), py = r * Math.sin(a);
+    if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
+    else ctx.lineTo(t.tx(px), t.ty(py));
+  }
+  ctx.closePath();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  drawText(ctx, t, 0, 0, 'B', { color: '#333', size: 16 });
+
+  // --- RIGHT WING ---
+  var Px = r * Math.cos(connRad);
+  var Py = r * Math.sin(connRad);
+  drawDot(ctx, t, Px, Py, 5);
+
+  var weX = Px + BACK_WALL_LEN * Math.cos(wallAngle);
+  var weY = Py + BACK_WALL_LEN * Math.sin(wallAngle);
+  drawLine(ctx, t, Px, Py, weX, weY, '#000', 2);
+
+  var w2Angle = wallAngle - Math.PI / 2;
+  var w2DirX = Math.cos(w2Angle), w2DirY = Math.sin(w2Angle);
+  var w2eX = weX + wallX * w2DirX;
+  var w2eY = weY + wallX * w2DirY;
+  drawLine(ctx, t, weX, weY, w2eX, w2eY, '#000', 2);
+  drawDot(ctx, t, weX, weY, 4);
+
+  var peX = w2eX + rightSection * w2DirX;
+  var peY = w2eY + rightSection * w2DirY;
+  drawLine(ctx, t, w2eX, w2eY, peX, peY, '#000', 2);
+  drawSquare(ctx, t, peX, peY, 8);
+  drawDot(ctx, t, w2eX, w2eY, 4);
+
+  // Wall back to dome (quadratic intersection)
+  var w3Angle = w2Angle - Math.PI / 2;
+  var w3DirX = Math.cos(w3Angle), w3DirY = Math.sin(w3Angle);
+  var aCoef = 1.0;
+  var bCoef = 2 * (w2eX * w3DirX + w2eY * w3DirY);
+  var cCoef = w2eX * w2eX + w2eY * w2eY - r * r;
+  var disc = bCoef * bCoef - 4 * aCoef * cCoef;
+  var w3eX, w3eY, tHit;
+  if (disc >= 0) {
+    tHit = (-bCoef - Math.sqrt(disc)) / (2 * aCoef);
+    w3eX = w2eX + tHit * w3DirX;
+    w3eY = w2eY + tHit * w3DirY;
+    drawLine(ctx, t, w2eX, w2eY, w3eX, w3eY, '#000', 2);
+    drawDot(ctx, t, w3eX, w3eY, 4);
+  }
+
+  // Right wing dimension labels
+  var perpX = Math.sin(wallAngle), perpY = -Math.cos(wallAngle);
+  var wmX = (Px + weX) / 2, wmY = (Py + weY) / 2;
+  drawText(ctx, t, wmX + 1.5 * perpX, wmY + 1.5 * perpY, "30'",
+    { color: '#333', size: 11, rotation: WALL_ANGLE_DEG });
+
+  var perp2X = Math.sin(w2Angle), perp2Y = -Math.cos(w2Angle);
+  var w2mX = (weX + w2eX) / 2, w2mY = (weY + w2eY) / 2;
+  drawText(ctx, t, w2mX + 1.5 * perp2X, w2mY + 1.5 * perp2Y, wallX.toFixed(1) + "'",
+    { color: '#333', size: 11, rotation: w2Angle * 180 / Math.PI });
+
+  var emX = (w2eX + peX) / 2, emY = (w2eY + peY) / 2;
+  drawText(ctx, t, emX + 1.5 * perp2X, emY + 1.5 * perp2Y, rightSection.toFixed(1) + "'",
+    { color: '#333', size: 11, rotation: w2Angle * 180 / Math.PI });
+
+  drawText(ctx, t, weX + 1.5, weY + 1.5, "20' high", { color: '#666', size: 9 });
+  drawText(ctx, t, w2eX + 1.5, w2eY + 1.5, "12' high", { color: '#666', size: 9 });
+  drawText(ctx, t, peX - 1.5, peY - 1.5, "Post (8')", { color: '#333', size: 9 });
+
+  if (disc >= 0) {
+    var perp3X = Math.sin(w3Angle), perp3Y = -Math.cos(w3Angle);
+    var w3mX = (w2eX + w3eX) / 2, w3mY = (w2eY + w3eY) / 2;
+    drawText(ctx, t, w3mX + 2 * perp3X, w3mY + 2 * perp3Y, tHit.toFixed(1) + "'",
+      { color: '#333', size: 11, rotation: w3Angle * 180 / Math.PI + 180 });
+  }
+
+  // --- LEFT WING (mirror) ---
+  var mPLx = -Px, mPLy = Py;
+  drawDot(ctx, t, mPLx, mPLy, 5);
+
+  var mweLx = -weX, mweLy = weY;
+  drawLine(ctx, t, mPLx, mPLy, mweLx, mweLy, '#000', 2);
+
+  var mw2eLx = -w2eX, mw2eLy = w2eY;
+  drawLine(ctx, t, mweLx, mweLy, mw2eLx, mw2eLy, '#000', 2);
+  drawDot(ctx, t, mweLx, mweLy, 4);
+
+  var mpeLx = -peX, mpeLy = peY;
+  drawLine(ctx, t, mw2eLx, mw2eLy, mpeLx, mpeLy, '#000', 2);
+  drawSquare(ctx, t, mpeLx, mpeLy, 8);
+  drawDot(ctx, t, mw2eLx, mw2eLy, 4);
+
+  if (disc >= 0) {
+    var mw3eLx = -w3eX, mw3eLy = w3eY;
+    drawLine(ctx, t, mw2eLx, mw2eLy, mw3eLx, mw3eLy, '#000', 2);
+    drawDot(ctx, t, mw3eLx, mw3eLy, 4);
+
+    var mw3mLx = -(w2eX + w3eX) / 2, mw3mLy = (w2eY + w3eY) / 2;
+    drawText(ctx, t, mw3mLx - 2 * perp3X, mw3mLy + 2 * perp3Y, tHit.toFixed(1) + "'",
+      { color: '#333', size: 11, rotation: -(w3Angle * 180 / Math.PI + 180) });
+  }
+
+  // Left wing dimension labels
+  var mwmLx = -wmX, mwmLy = wmY;
+  drawText(ctx, t, mwmLx - 1.5 * perpX, mwmLy + 1.5 * perpY, "30'",
+    { color: '#333', size: 11, rotation: -WALL_ANGLE_DEG });
+
+  var mw2mLx = -w2mX, mw2mLy = w2mY;
+  drawText(ctx, t, mw2mLx - 1.5 * perp2X, mw2mLy + 1.5 * perp2Y, wallX.toFixed(1) + "'",
+    { color: '#333', size: 11, rotation: -(w2Angle * 180 / Math.PI) });
+
+  var memLx = -emX, memLy = emY;
+  drawText(ctx, t, memLx - 1.5 * perp2X, memLy + 1.5 * perp2Y, rightSection.toFixed(1) + "'",
+    { color: '#333', size: 11, rotation: -(w2Angle * 180 / Math.PI) });
+
+  drawText(ctx, t, mweLx - 1.5, mweLy + 1.5, "20' high", { color: '#666', size: 9, align: 'right' });
+  drawText(ctx, t, mw2eLx - 1.5, mw2eLy + 1.5, "12' high", { color: '#666', size: 9, align: 'right' });
+  drawText(ctx, t, mpeLx + 1.5, mpeLy - 1.5, "Post (8')", { color: '#333', size: 9 });
+
+  // --- FRONT RECTANGLE + ARC ---
+  var halfWidth = 4.0;
+  var yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
+  drawLine(ctx, t, -halfWidth, yInt, halfWidth, yInt, '#000', 2);
+  drawDot(ctx, t, -halfWidth, yInt, 5);
+  drawDot(ctx, t, halfWidth, yInt, 5);
+
+  var leftBot = [-halfWidth, yInt - 5];
+  var rightBot = [halfWidth, yInt - 5];
+  drawLine(ctx, t, -halfWidth, yInt, leftBot[0], leftBot[1], '#000', 2);
+  drawLine(ctx, t, halfWidth, yInt, rightBot[0], rightBot[1], '#000', 2);
+  drawLine(ctx, t, leftBot[0], leftBot[1], rightBot[0], rightBot[1], '#000', 2);
+
+  // Front arc between posts
+  var botY = leftBot[1];
+  var arcCy = (peX * peX + peY * peY - botY * botY) / (2 * (peY - botY));
+  var arcRad = Math.abs(arcCy - botY);
+  var aRight = Math.atan2(peY - arcCy, peX);
+  var aLeft = Math.atan2(mpeLy - arcCy, mpeLx);
+
+  ctx.beginPath();
+  for (var ai = 0; ai <= 200; ai++) {
+    var aa = aRight + (aLeft - aRight) * (ai / 200);
+    var ax = arcRad * Math.cos(aa);
+    var ay = arcCy + arcRad * Math.sin(aa);
+    if (ai === 0) ctx.moveTo(t.tx(ax), t.ty(ay));
+    else ctx.lineTo(t.tx(ax), t.ty(ay));
+  }
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+
+  // Title
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.fillText('Floor Plan (Top Down)', w / 2, 20);
+
+  // Axis labels
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.textAlign = 'center';
+  ctx.fillText('Feet', w / 2, h - 4);
+  ctx.save();
+  ctx.translate(12, h / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Feet', 0, 0);
+  ctx.restore();
+
+  return tHit;
+}
+
+// ===================================================================
+// Update Loop
+// ===================================================================
+function update() {
+  var pitchDeg = parseFloat(slider.value);
+  var g = computeGeometry(pitchDeg);
+  document.getElementById('pitch-value').textContent = pitchDeg.toFixed(1) + '\u00B0';
+
+  var tHit = drawFloorPlan(g);
+
+  document.getElementById('sum-wing').textContent = g.wallX.toFixed(1) + "'";
+  document.getElementById('sum-ext').textContent = g.rightSection.toFixed(1) + "'";
+  document.getElementById('sum-span').textContent = g.horizSpan.toFixed(1) + "'";
+  document.getElementById('sum-bottom').textContent = tHit ? tHit.toFixed(1) + "'" : '--';
+  document.getElementById('sum-pitch').textContent = pitchDeg.toFixed(1) + '\u00B0';
+
+  history.replaceState(null, '', '#pitch=' + pitchDeg.toFixed(1));
+}
+
+// ===================================================================
+// Export / Share
+// ===================================================================
+function exportPNG() {
+  var canvas = document.getElementById('floor-plan');
+  canvas.toBlob(function(blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'floor-plan-' + slider.value + 'deg.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function shareLink() {
+  var url = window.location.href;
+  navigator.clipboard.writeText(url).then(function() {
+    var btns = document.querySelectorAll('.actions button');
+    var btn = btns[1];
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  });
+}
+
+// ===================================================================
+// Init
+// ===================================================================
+var slider = document.getElementById('pitch-slider');
+
+var hashMatch = window.location.hash.match(/pitch=([\d.]+)/);
+if (hashMatch) {
+  var v = parseFloat(hashMatch[1]);
+  if (v >= 20 && v <= 35) slider.value = v;
+}
+
+slider.addEventListener('input', update);
+window.addEventListener('resize', update);
+
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'setPitch') {
+    var v = parseFloat(e.data.value);
+    if (v >= 20 && v <= 35) { slider.value = v; update(); }
+  }
+});
+
+update();
+</script>
+</body>
+</html>
