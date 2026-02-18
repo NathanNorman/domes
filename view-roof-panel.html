@@ -326,12 +326,6 @@ function computeUnfoldedPanel(g) {
   var sPost = stretchWorld(PostX, PostY);
   var sW3 = stretchWorld(W3x, W3y);
 
-  // PostDome: radial projection of Post onto dome circle
-  var postAngle = Math.atan2(PostY, PostX);
-  var PostDomeX = r * Math.cos(postAngle);
-  var PostDomeY = r * Math.sin(postAngle);
-  var sPostDome = stretchWorld(PostDomeX, PostDomeY);
-
   // --- Edge length helper ---
   function dist(a, b) {
     var dx = b[0] - a[0], dy = b[1] - a[1];
@@ -353,49 +347,27 @@ function computeUnfoldedPanel(g) {
     arcPtsStretched.push(stretchWorld(ax, ay));
   }
 
-  // Sample dome arc from PostDome to W3 (replaces straight Post→W3 line)
-  var ARC_PD_N = 10;
-  var arcAnglePD = Math.atan2(PostDomeY, PostDomeX);
-  var arcSpanPD = arcAngleW3 - arcAnglePD;
-  while (arcSpanPD > Math.PI) arcSpanPD -= 2 * Math.PI;
-  while (arcSpanPD < -Math.PI) arcSpanPD += 2 * Math.PI;
-
-  var postToW3Arc = [];
-  for (var pi = 1; pi < ARC_PD_N; pi++) {
-    var theta = arcAnglePD + pi * arcSpanPD / ARC_PD_N;
-    postToW3Arc.push(stretchWorld(r * Math.cos(theta), r * Math.sin(theta)));
-  }
-
-  // Full polygon: 6 main vertices + two dome arcs (PostDome → W3 → P)
-  var pts = [sP, sW, sW2, sPost, sPostDome].concat(postToW3Arc).concat([sW3]).concat(arcPtsStretched);
-  var mainVerts = [sP, sW, sW2, sPost, sPostDome, sW3];
+  // Full polygon: 5 main vertices + dome arc samples (W3 → P)
+  var pts = [sP, sW, sW2, sPost, sW3].concat(arcPtsStretched);
+  var mainVerts = [sP, sW, sW2, sPost, sW3];
 
   // --- Straight edge lengths ---
   var edgePW = dist(sP, sW);
   var edgeWW2 = dist(sW, sW2);
   var edgeW2Post = dist(sW2, sPost);
-  var edgePostPD = dist(sPost, sPostDome);
+  var edgePostW3 = dist(sPost, sW3);
   var edgeW2W3 = dist(sW2, sW3);
 
-  // --- Dome arc length (PostDome → W3 → P, sum of all dome segments) ---
+  // --- Dome arc length (W3 → P, sum of segments in stretched space) ---
   var domeArcLen = 0;
-  // PostDome → W3 arc
-  var arcPrev = sPostDome;
-  for (var ai = 0; ai < postToW3Arc.length; ai++) {
-    domeArcLen += dist(arcPrev, postToW3Arc[ai]);
-    arcPrev = postToW3Arc[ai];
-  }
-  domeArcLen += dist(arcPrev, sW3);
-  // W3 → P arc
-  arcPrev = sW3;
+  var arcPrev = sW3;
   for (var ai = 0; ai < arcPtsStretched.length; ai++) {
     domeArcLen += dist(arcPrev, arcPtsStretched[ai]);
     arcPrev = arcPtsStretched[ai];
   }
   domeArcLen += dist(arcPrev, sP);
 
-  var allDomeArcPts = [sPostDome].concat(postToW3Arc).concat([sW3]).concat(arcPtsStretched);
-  var arcMidPt = allDomeArcPts[Math.floor(allDomeArcPts.length / 2)];
+  var arcMidPt = arcPtsStretched[Math.floor(arcPtsStretched.length / 2)];
 
   // --- Area via Shoelace formula on full polygon (with arc) ---
   var area = 0;
@@ -409,11 +381,11 @@ function computeUnfoldedPanel(g) {
   return {
     points: pts,
     mainVerts: mainVerts,
-    sP: sP, sW: sW, sW2: sW2, sPost: sPost, sPostDome: sPostDome, sW3: sW3,
+    sP: sP, sW: sW, sW2: sW2, sPost: sPost, sW3: sW3,
     edgePW: edgePW,
     edgeWW2: edgeWW2,
     edgeW2Post: edgeW2Post,
-    edgePostPD: edgePostPD,
+    edgePostW3: edgePostW3,
     edgeW2W3: edgeW2W3,
     domeArcLen: domeArcLen,
     arcMidPt: arcMidPt,
@@ -539,12 +511,13 @@ function drawPanel(g) {
   for (var k = 0; k < mv.length; k++) { cx += mv[k][0]; cy += mv[k][1]; }
   cx /= mv.length; cy /= mv.length;
 
-  // Edge definitions (3 straight edges; inner wall + dome arc handled separately)
+  // Edge definitions (4 straight edges; inner wall + dome arc handled separately)
   var sf = panel.stretchFactor;
   var edges = [
     { from: 0, to: 1, len: panel.edgePW, label: 'Back wall (ridge)', color: '#2c3e50', perp: false },
     { from: 1, to: 2, len: panel.edgeWW2, label: 'Wing wall', color: '#8e44ad', perp: true },
-    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension', color: '#d35400', perp: true }
+    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension', color: '#d35400', perp: true },
+    { from: 3, to: 4, len: panel.edgePostW3, label: 'Porch edge', color: '#7f8c8d', perp: false }
   ];
 
   for (var e = 0; e < edges.length; e++) {
@@ -747,27 +720,24 @@ function drawPanel(g) {
   }
 
   // Corner dots and labels
-  var cornerNames = ['P', 'W', 'W2', 'Post', 'PostDome', 'W3'];
-  var cornerDescs = ['dome conn (20\')', 'back wall end (20\')', 'wing wall (12\')', 'outer post (8\')', 'dome intersect', 'dome intersect (12\')'];
-  var cornerColors = ['#27ae60', '#2c3e50', '#8e44ad', '#d35400', '#e67e22', '#16a085'];
+  var cornerNames = ['P', 'W', 'W2', 'Post', 'W3'];
+  var cornerDescs = ['dome conn (20\')', 'back wall end (20\')', 'wing wall (12\')', 'outer post (8\')', 'dome intersect (12\')'];
+  var cornerColors = ['#27ae60', '#2c3e50', '#8e44ad', '#d35400', '#16a085'];
 
-  for (var c = 0; c < 6; c++) {
+  for (var c = 0; c < 5; c++) {
     var pt = mv[c];
     // Dot
     ctx.beginPath();
-    ctx.arc(t.tx(pt[0]), t.ty(pt[1]), cornerNames[c] === 'PostDome' ? 3 : 5, 0, 2 * Math.PI);
+    ctx.arc(t.tx(pt[0]), t.ty(pt[1]), 5, 0, 2 * Math.PI);
     ctx.fillStyle = cornerColors[c];
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Skip text labels for PostDome (technical vertex, too close to W3)
-    if (cornerNames[c] === 'PostDome') continue;
-
     // Bisector direction for label placement
-    var prev = mv[(c + 5) % 6];
-    var next = mv[(c + 1) % 6];
+    var prev = mv[(c + 4) % 5];
+    var next = mv[(c + 1) % 5];
     var toPrev = [prev[0] - pt[0], prev[1] - pt[1]];
     var toNext = [next[0] - pt[0], next[1] - pt[1]];
     var lPrev = Math.sqrt(toPrev[0] * toPrev[0] + toPrev[1] * toPrev[1]);
