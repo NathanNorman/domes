@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hippie Hideout — Roof Pitch Geometry Explorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+    min-height: 100vh;
+  }
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 16px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.4em; font-weight: 600; letter-spacing: 0.02em; }
+  header p { font-size: 0.85em; opacity: 0.7; margin-top: 4px; }
+
+  .canvas-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .canvas-wrap {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 8px;
+    flex: 1 1 500px;
+    max-width: 700px;
+    min-width: 320px;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: crosshair;
+  }
+
+  .controls {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 16px 8px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .slider-row label {
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: #2c3e50;
+    height: 6px;
+  }
+  .slider-row .value {
+    font-weight: 700;
+    font-size: 1.1em;
+    min-width: 42px;
+    text-align: right;
+    color: #c0392b;
+  }
+
+  .summary {
+    max-width: 1420px;
+    margin: 8px auto;
+    padding: 0 16px;
+  }
+  .summary-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 12px 20px;
+    justify-content: center;
+  }
+  .summary-item {
+    text-align: center;
+    min-width: 100px;
+  }
+  .summary-item .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-item .val { font-size: 1.3em; font-weight: 700; color: #2c3e50; }
+
+  .actions {
+    text-align: center;
+    padding: 12px;
+  }
+  .actions button {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    cursor: pointer;
+    margin: 0 4px;
+    transition: background 0.2s;
+  }
+  .actions button:hover { background: #34495e; }
+
+  @media (max-width: 768px) {
+    .canvas-row { flex-direction: column; align-items: center; }
+    .canvas-wrap { max-width: 100%; }
+    header h1 { font-size: 1.1em; }
+  }
+  @media print {
+    header { background: white; color: black; }
+    .controls, .actions { display: none; }
+    .canvas-wrap { box-shadow: none; border: 1px solid #ccc; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hippie Hideout — Roof Pitch Geometry Explorer</h1>
+  <p>Interactive cross-section and floor plan driven by roof pitch angle</p>
+</header>
+
+<div class="canvas-row">
+  <div class="canvas-wrap">
+    <canvas id="cross-section" width="1400" height="800"></canvas>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="floor-plan" width="1400" height="1000"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="slider-row">
+    <label for="pitch-slider">Roof Pitch:</label>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
+    <span class="value" id="pitch-value">20.0&deg;</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-grid">
+    <div class="summary-item"><div class="label">Wing Room</div><div class="val" id="sum-wing">22.0'</div></div>
+    <div class="summary-item"><div class="label">Extension</div><div class="val" id="sum-ext">11.0'</div></div>
+    <div class="summary-item"><div class="label">Total Span</div><div class="val" id="sum-span">33.0'</div></div>
+    <div class="summary-item"><div class="label">Rafter</div><div class="val" id="sum-rafter">35.1'</div></div>
+    <div class="summary-item"><div class="label">Bottom Wall</div><div class="val" id="sum-bottom">--</div></div>
+  </div>
+</div>
+
+<div class="actions">
+  <button onclick="exportPNG('cross-section')">Export Cross-Section</button>
+  <button onclick="exportPNG('floor-plan')">Export Floor Plan</button>
+  <button onclick="exportBoth()">Export Both</button>
+  <button onclick="shareLink()">Copy Share Link</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Constants (from Python)
+// ═══════════════════════════════════════════════════════════════
+const LEFT_WALL_H = 20.0;
+const RIGHT_POST_H = 8.0;
+const ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
+const INTERIOR_WALL_H = 12.0;
+const BACK_WALL_LEN = 30.0;
+const DOME_R = 16.5;
+const CONN_ANGLE_DEG = 20.0;
+const WALL_ANGLE_DEG = -25.0;
+
+const DEG2RAD = Math.PI / 180;
+
+// ═══════════════════════════════════════════════════════════════
+// Geometry Engine
+// ═══════════════════════════════════════════════════════════════
+function computeGeometry(pitchDeg) {
+  const rad = pitchDeg * DEG2RAD;
+  const horizSpan = ROOF_DROP / Math.tan(rad);
+  const wallX = (LEFT_WALL_H - INTERIOR_WALL_H) / Math.tan(rad);
+  const rafterLen = ROOF_DROP / Math.sin(rad);
+  const rightSection = horizSpan - wallX;
+  return { pitchDeg, rad, horizSpan, wallX, rafterLen, rightSection };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Drawing Utilities
+// ═══════════════════════════════════════════════════════════════
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+// World-to-screen transform helpers
+function makeTransform(w, h, xMin, xMax, yMin, yMax) {
+  const padX = 0.05 * w, padY = 0.05 * h;
+  const drawW = w - 2 * padX;
+  const drawH = h - 2 * padY;
+  const scaleX = drawW / (xMax - xMin);
+  const scaleY = drawH / (yMax - yMin);
+  const scale = Math.min(scaleX, scaleY);
+  const offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
+  const offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
+  return {
+    tx: (x) => offsetX + (x - xMin) * scale,
+    ty: (y) => h - (offsetY + (y - yMin) * scale),
+    scale,
+  };
+}
+
+function drawLine(ctx, t, x1, y1, x2, y2, color, lw) {
+  ctx.beginPath();
+  ctx.moveTo(t.tx(x1), t.ty(y1));
+  ctx.lineTo(t.tx(x2), t.ty(y2));
+  ctx.strokeStyle = color || '#000';
+  ctx.lineWidth = lw || 2;
+  ctx.stroke();
+}
+
+function drawXMark(ctx, t, x, y, size) {
+  const s = size || 0.5;
+  drawLine(ctx, t, x - s, y - s, x + s, y + s, '#000', 1.5);
+  drawLine(ctx, t, x - s, y + s, x + s, y - s, '#000', 1.5);
+}
+
+function drawDot(ctx, t, x, y, r, color) {
+  ctx.beginPath();
+  ctx.arc(t.tx(x), t.ty(y), r || 4, 0, 2 * Math.PI);
+  ctx.fillStyle = color || '#000';
+  ctx.fill();
+}
+
+function drawSquare(ctx, t, x, y, size, color) {
+  const s = size || 6;
+  ctx.fillStyle = color || '#000';
+  ctx.fillRect(t.tx(x) - s/2, t.ty(y) - s/2, s, s);
+}
+
+function drawText(ctx, t, x, y, text, opts) {
+  opts = opts || {};
+  ctx.save();
+  ctx.font = `${opts.weight || 'bold'} ${opts.size || 12}px -apple-system, sans-serif`;
+  ctx.fillStyle = opts.color || '#333';
+  ctx.textAlign = opts.align || 'center';
+  ctx.textBaseline = opts.baseline || 'middle';
+  const sx = t.tx(x), sy = t.ty(y);
+  if (opts.rotation) {
+    ctx.translate(sx, sy);
+    ctx.rotate(-opts.rotation * DEG2RAD);
+    ctx.fillText(text, 0, 0);
+  } else {
+    ctx.fillText(text, sx, sy);
+  }
+  ctx.restore();
+}
+
+function drawArrow(ctx, t, x1, y1, x2, y2, color) {
+  const sx1 = t.tx(x1), sy1 = t.ty(y1);
+  const sx2 = t.tx(x2), sy2 = t.ty(y2);
+  const headLen = 6;
+  const angle = Math.atan2(sy2 - sy1, sx2 - sx1);
+
+  ctx.beginPath();
+  ctx.moveTo(sx1, sy1);
+  ctx.lineTo(sx2, sy2);
+  ctx.strokeStyle = color || 'blue';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Arrowheads both ends
+  for (const [sx, sy, dir] of [[sx1, sy1, 1], [sx2, sy2, -1]]) {
+    const a = angle + dir * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + headLen * Math.cos(a - 0.4), sy + headLen * Math.sin(a - 0.4));
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + headLen * Math.cos(a + 0.4), sy + headLen * Math.sin(a + 0.4));
+    ctx.stroke();
+  }
+}
+
+function drawGrid(ctx, t, xMin, xMax, yMin, yMax, majorStep, minorStep) {
+  // Minor grid
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 0.3;
+  ctx.globalAlpha = 0.4;
+  for (let x = Math.ceil(xMin / minorStep) * minorStep; x <= xMax; x += minorStep) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(x), t.ty(yMin));
+    ctx.lineTo(t.tx(x), t.ty(yMax));
+    ctx.stroke();
+  }
+  for (let y = Math.ceil(yMin / minorStep) * minorStep; y <= yMax; y += minorStep) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(xMin), t.ty(y));
+    ctx.lineTo(t.tx(xMax), t.ty(y));
+    ctx.stroke();
+  }
+  // Major grid
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 0.5;
+  ctx.globalAlpha = 0.5;
+  for (let x = Math.ceil(xMin / majorStep) * majorStep; x <= xMax; x += majorStep) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(x), t.ty(yMin));
+    ctx.lineTo(t.tx(x), t.ty(yMax));
+    ctx.stroke();
+  }
+  for (let y = Math.ceil(yMin / majorStep) * majorStep; y <= yMax; y += majorStep) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(xMin), t.ty(y));
+    ctx.lineTo(t.tx(xMax), t.ty(y));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1.0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Cross-Section Renderer
+// ═══════════════════════════════════════════════════════════════
+function drawCrossSection(g) {
+  const canvas = document.getElementById('cross-section');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const maxSpan = ROOF_DROP / Math.tan(20 * DEG2RAD);
+
+  const xMin = -3, xMax = maxSpan + 4;
+  const yMin = -4.5, yMax = LEFT_WALL_H + 2;
+  const t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+
+  // Background
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid
+  drawGrid(ctx, t, xMin, xMax, yMin, yMax, 5, 1);
+
+  const { horizSpan, wallX, rafterLen, rightSection, pitchDeg, rad } = g;
+
+  // Structure lines
+  drawLine(ctx, t, 0, 0, horizSpan, 0, '#000', 2.5);           // ground
+  drawLine(ctx, t, 0, 0, 0, LEFT_WALL_H, '#000', 2.5);         // left wall
+  drawLine(ctx, t, horizSpan, 0, horizSpan, RIGHT_POST_H, '#000', 2.5); // right post
+  drawLine(ctx, t, 0, LEFT_WALL_H, horizSpan, RIGHT_POST_H, '#000', 2.5); // roof
+  drawLine(ctx, t, wallX, 0, wallX, INTERIOR_WALL_H, '#000', 2);  // interior wall
+
+  // X marks at joints
+  const joints = [[0,0],[0,LEFT_WALL_H],[horizSpan,0],[horizSpan,RIGHT_POST_H],[wallX,0],[wallX,INTERIOR_WALL_H]];
+  for (const [jx, jy] of joints) drawXMark(ctx, t, jx, jy);
+
+  // Dimension: left wall 20'
+  drawArrow(ctx, t, -0.6, 0, -0.6, LEFT_WALL_H, 'blue');
+  drawText(ctx, t, -1.5, LEFT_WALL_H / 2, "20'", { color: '#333', size: 13 });
+
+  // Dimension: right post 8'
+  drawArrow(ctx, t, horizSpan + 0.6, 0, horizSpan + 0.6, RIGHT_POST_H, 'blue');
+  drawText(ctx, t, horizSpan + 2, RIGHT_POST_H / 2, "8'", { color: '#333', size: 13 });
+
+  // Dimension: interior wall 12'
+  drawArrow(ctx, t, wallX + 0.6, 0, wallX + 0.6, INTERIOR_WALL_H, 'blue');
+  drawText(ctx, t, wallX + 1.5, 6, "12'", { color: '#333', size: 13 });
+
+  // Angle arc at top-left
+  const arcR = 3;
+  ctx.beginPath();
+  for (let i = 0; i <= 50; i++) {
+    const a = -rad + (rad) * (i / 50);
+    const ax = arcR * Math.cos(a);
+    const ay = LEFT_WALL_H + arcR * Math.sin(a);
+    if (i === 0) ctx.moveTo(t.tx(ax), t.ty(ay));
+    else ctx.lineTo(t.tx(ax), t.ty(ay));
+  }
+  ctx.strokeStyle = '#c0392b';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Horizontal reference line
+  drawLine(ctx, t, 0, LEFT_WALL_H, arcR + 1, LEFT_WALL_H, '#c0392b', 1);
+  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = 1.0;
+
+  drawText(ctx, t, arcR + 0.8, LEFT_WALL_H - 1.0, `${pitchDeg.toFixed(0)}\u00B0`, { color: '#c0392b', size: 13, align: 'left' });
+
+  // Roof label
+  const roofRot = Math.atan2(ROOF_DROP, horizSpan) * 180 / Math.PI;
+  const roofMidX = horizSpan * 0.35;
+  const roofMidY = LEFT_WALL_H - roofMidX * Math.tan(rad);
+  drawText(ctx, t, roofMidX, roofMidY + 1.2, 'Roof', { color: '#333', size: 11, weight: 'italic', rotation: roofRot });
+
+  // Total horizontal span
+  drawArrow(ctx, t, 0, -1.3, horizSpan, -1.3, 'darkgreen');
+  drawText(ctx, t, horizSpan / 2, -1.8, `${horizSpan.toFixed(1)}'`, { color: 'darkgreen', size: 13 });
+
+  // Wing room width
+  drawText(ctx, t, wallX / 2, 4, `Wing: ${wallX.toFixed(1)}'`, { color: '#888', size: 11 });
+
+  // Extension width
+  drawArrow(ctx, t, wallX, -2.8, horizSpan, -2.8, 'purple');
+  drawText(ctx, t, wallX + rightSection / 2, -3.5, `${rightSection.toFixed(1)}'`, { color: 'purple', size: 11 });
+
+  // Rafter label
+  drawText(ctx, t, horizSpan * 0.55, RIGHT_POST_H + 1.5, `Rafter: ${rafterLen.toFixed(1)}'`, { color: 'brown', size: 10, rotation: roofRot });
+
+  // WALL label
+  drawText(ctx, t, wallX + 1.2, INTERIOR_WALL_H + 0.7, 'WALL', { color: '#333', size: 10, align: 'left' });
+
+  // Title
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.fillText('Cross-Section (Side View)', w / 2, 20);
+
+  // Axis labels
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.textAlign = 'center';
+  ctx.fillText('Feet', w / 2, h - 4);
+  ctx.save();
+  ctx.translate(12, h / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Feet', 0, 0);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Floor Plan Renderer
+// ═══════════════════════════════════════════════════════════════
+function drawFloorPlan(g) {
+  const canvas = document.getElementById('floor-plan');
+  const { ctx, w, h } = setupCanvas(canvas);
+
+  const xMin = -52, xMax = 52;
+  const yMin = -42, yMax = 22;
+  const t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+
+  // Background
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid
+  drawGrid(ctx, t, xMin, xMax, yMin, yMax, 5, 1);
+
+  const { wallX, rightSection } = g;
+  const r = DOME_R;
+  const wallAngle = WALL_ANGLE_DEG * DEG2RAD;
+  const connRad = CONN_ANGLE_DEG * DEG2RAD;
+
+  // --- DOME ---
+  ctx.beginPath();
+  for (let i = 0; i <= 500; i++) {
+    const a = (2 * Math.PI * i) / 500;
+    const px = r * Math.cos(a), py = r * Math.sin(a);
+    if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
+    else ctx.lineTo(t.tx(px), t.ty(py));
+  }
+  ctx.closePath();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  drawText(ctx, t, 0, 0, 'B', { color: '#333', size: 16 });
+
+  // --- RIGHT WING ---
+  const Px = r * Math.cos(connRad);
+  const Py = r * Math.sin(connRad);
+  drawDot(ctx, t, Px, Py, 5);
+
+  // 30' back wall at angle
+  const weX = Px + BACK_WALL_LEN * Math.cos(wallAngle);
+  const weY = Py + BACK_WALL_LEN * Math.sin(wallAngle);
+  drawLine(ctx, t, Px, Py, weX, weY, '#000', 2);
+
+  // Wing wall perpendicular to back wall
+  const w2Angle = wallAngle - Math.PI / 2;
+  const w2DirX = Math.cos(w2Angle), w2DirY = Math.sin(w2Angle);
+  const w2eX = weX + wallX * w2DirX;
+  const w2eY = weY + wallX * w2DirY;
+  drawLine(ctx, t, weX, weY, w2eX, w2eY, '#000', 2);
+  drawDot(ctx, t, weX, weY, 4);
+
+  // Extension to post
+  const peX = w2eX + rightSection * w2DirX;
+  const peY = w2eY + rightSection * w2DirY;
+  drawLine(ctx, t, w2eX, w2eY, peX, peY, '#000', 2);
+  drawSquare(ctx, t, peX, peY, 8);
+  drawDot(ctx, t, w2eX, w2eY, 4);
+
+  // Wall back to dome from w2e (quadratic intersection)
+  const w3Angle = w2Angle - Math.PI / 2;
+  const w3DirX = Math.cos(w3Angle), w3DirY = Math.sin(w3Angle);
+  const aCoef = 1.0;
+  const bCoef = 2 * (w2eX * w3DirX + w2eY * w3DirY);
+  const cCoef = w2eX * w2eX + w2eY * w2eY - r * r;
+  const disc = bCoef * bCoef - 4 * aCoef * cCoef;
+  let w3eX, w3eY, tHit;
+  if (disc >= 0) {
+    tHit = (-bCoef - Math.sqrt(disc)) / (2 * aCoef);
+    w3eX = w2eX + tHit * w3DirX;
+    w3eY = w2eY + tHit * w3DirY;
+    drawLine(ctx, t, w2eX, w2eY, w3eX, w3eY, '#000', 2);
+    drawDot(ctx, t, w3eX, w3eY, 4);
+  }
+
+  // Right wing dimension labels
+  const perpX = Math.sin(wallAngle), perpY = -Math.cos(wallAngle);
+  const wmX = (Px + weX) / 2, wmY = (Py + weY) / 2;
+  drawText(ctx, t, wmX + 1.5 * perpX, wmY + 1.5 * perpY, "30'",
+    { color: '#333', size: 11, rotation: WALL_ANGLE_DEG });
+
+  const perp2X = Math.sin(w2Angle), perp2Y = -Math.cos(w2Angle);
+  const w2mX = (weX + w2eX) / 2, w2mY = (weY + w2eY) / 2;
+  drawText(ctx, t, w2mX + 1.5 * perp2X, w2mY + 1.5 * perp2Y, `${wallX.toFixed(1)}'`,
+    { color: '#333', size: 11, rotation: w2Angle * 180 / Math.PI });
+
+  const emX = (w2eX + peX) / 2, emY = (w2eY + peY) / 2;
+  drawText(ctx, t, emX + 1.5 * perp2X, emY + 1.5 * perp2Y, `${rightSection.toFixed(1)}'`,
+    { color: '#333', size: 11, rotation: w2Angle * 180 / Math.PI });
+
+  // Height labels
+  drawText(ctx, t, weX + 1.5, weY + 1.5, "20' high", { color: '#666', size: 9 });
+  drawText(ctx, t, w2eX + 1.5, w2eY + 1.5, "12' high", { color: '#666', size: 9 });
+  drawText(ctx, t, peX - 1.5, peY - 1.5, "Post (8')", { color: '#333', size: 9 });
+
+  if (disc >= 0) {
+    const perp3X = Math.sin(w3Angle), perp3Y = -Math.cos(w3Angle);
+    const w3mX = (w2eX + w3eX) / 2, w3mY = (w2eY + w3eY) / 2;
+    drawText(ctx, t, w3mX + 2 * perp3X, w3mY + 2 * perp3Y, `${tHit.toFixed(1)}'`,
+      { color: '#333', size: 11, rotation: w3Angle * 180 / Math.PI + 180 });
+  }
+
+  // --- LEFT WING (mirror over Y axis) ---
+  const mirror = (x, y) => [-x, y];
+
+  const [PLx, PLy] = mirror(Px, Py);
+  drawDot(ctx, t, PLx, PLy, 5);
+
+  const [weLx, weLy] = mirror(weX, weY);
+  drawLine(ctx, t, PLx, PLy, weLx, weLy, '#000', 2);
+
+  const [w2eLx, w2eLy] = mirror(w2eX, w2eY);
+  drawLine(ctx, t, weLx, weLy, w2eLx, w2eLy, '#000', 2);
+  drawDot(ctx, t, weLx, weLy, 4);
+
+  const [peLx, peLy] = mirror(peX, peY);
+  drawLine(ctx, t, w2eLx, w2eLy, peLx, peLy, '#000', 2);
+  drawSquare(ctx, t, peLx, peLy, 8);
+  drawDot(ctx, t, w2eLx, w2eLy, 4);
+
+  if (disc >= 0) {
+    const [w3eLx, w3eLy] = mirror(w3eX, w3eY);
+    drawLine(ctx, t, w2eLx, w2eLy, w3eLx, w3eLy, '#000', 2);
+    drawDot(ctx, t, w3eLx, w3eLy, 4);
+
+    // Left bottom wall label
+    const perp3X = Math.sin(w3Angle), perp3Y = -Math.cos(w3Angle);
+    const [w3mLx, w3mLy] = mirror((w2eX + w3eX) / 2, (w2eY + w3eY) / 2);
+    drawText(ctx, t, w3mLx - 2 * perp3X, w3mLy + 2 * perp3Y, `${tHit.toFixed(1)}'`,
+      { color: '#333', size: 11, rotation: -(w3Angle * 180 / Math.PI + 180) });
+  }
+
+  // Left wing dimension labels
+  const [wmLx, wmLy] = mirror(wmX, wmY);
+  drawText(ctx, t, wmLx - 1.5 * perpX, wmLy + 1.5 * perpY, "30'",
+    { color: '#333', size: 11, rotation: -WALL_ANGLE_DEG });
+
+  const [w2mLx, w2mLy] = mirror(w2mX, w2mY);
+  drawText(ctx, t, w2mLx - 1.5 * perp2X, w2mLy + 1.5 * perp2Y, `${wallX.toFixed(1)}'`,
+    { color: '#333', size: 11, rotation: -(w2Angle * 180 / Math.PI) });
+
+  const [emLx, emLy] = mirror(emX, emY);
+  drawText(ctx, t, emLx - 1.5 * perp2X, emLy + 1.5 * perp2Y, `${rightSection.toFixed(1)}'`,
+    { color: '#333', size: 11, rotation: -(w2Angle * 180 / Math.PI) });
+
+  drawText(ctx, t, weLx - 1.5, weLy + 1.5, "20' high", { color: '#666', size: 9, align: 'right' });
+  drawText(ctx, t, w2eLx - 1.5, w2eLy + 1.5, "12' high", { color: '#666', size: 9, align: 'right' });
+  drawText(ctx, t, peLx + 1.5, peLy - 1.5, "Post (8')", { color: '#333', size: 9 });
+
+  // --- FRONT RECTANGLE + ARC ---
+  const halfWidth = 4.0;
+  const yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
+  const leftInt = [-halfWidth, yInt];
+  const rightInt = [halfWidth, yInt];
+
+  drawLine(ctx, t, leftInt[0], leftInt[1], rightInt[0], rightInt[1], '#000', 2);
+  drawDot(ctx, t, leftInt[0], leftInt[1], 5);
+  drawDot(ctx, t, rightInt[0], rightInt[1], 5);
+
+  const leftBot = [leftInt[0], leftInt[1] - 5];
+  const rightBot = [rightInt[0], rightInt[1] - 5];
+  drawLine(ctx, t, leftInt[0], leftInt[1], leftBot[0], leftBot[1], '#000', 2);
+  drawLine(ctx, t, rightInt[0], rightInt[1], rightBot[0], rightBot[1], '#000', 2);
+  drawLine(ctx, t, leftBot[0], leftBot[1], rightBot[0], rightBot[1], '#000', 2);
+
+  // Front arc between posts
+  const botY = leftBot[1];
+  const arcCy = (peX * peX + peY * peY - botY * botY) / (2 * (peY - botY));
+  const arcRad = Math.abs(arcCy - botY);
+  const aRight = Math.atan2(peY - arcCy, peX);
+  const aLeft = Math.atan2(peLy - arcCy, peLx);
+
+  ctx.beginPath();
+  for (let i = 0; i <= 200; i++) {
+    const a = aRight + (aLeft - aRight) * (i / 200);
+    const ax = arcRad * Math.cos(a);
+    const ay = arcCy + arcRad * Math.sin(a);
+    if (i === 0) ctx.moveTo(t.tx(ax), t.ty(ay));
+    else ctx.lineTo(t.tx(ax), t.ty(ay));
+  }
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+
+  // Title
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.fillText('Floor Plan (Top Down)', w / 2, 20);
+
+  // Axis labels
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.textAlign = 'center';
+  ctx.fillText('Feet', w / 2, h - 4);
+  ctx.save();
+  ctx.translate(12, h / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Feet', 0, 0);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Update Loop
+// ═══════════════════════════════════════════════════════════════
+function update() {
+  const pitchDeg = parseFloat(slider.value);
+  const g = computeGeometry(pitchDeg);
+
+  document.getElementById('pitch-value').textContent = pitchDeg.toFixed(1) + '\u00B0';
+  document.getElementById('sum-wing').textContent = g.wallX.toFixed(1) + "'";
+  document.getElementById('sum-ext').textContent = g.rightSection.toFixed(1) + "'";
+  document.getElementById('sum-span').textContent = g.horizSpan.toFixed(1) + "'";
+  document.getElementById('sum-rafter').textContent = g.rafterLen.toFixed(1) + "'";
+
+  // Compute bottom wall length for summary
+  const w2Angle = WALL_ANGLE_DEG * DEG2RAD - Math.PI / 2;
+  const w3Angle = w2Angle - Math.PI / 2;
+  const connRad = CONN_ANGLE_DEG * DEG2RAD;
+  const Px = DOME_R * Math.cos(connRad), Py = DOME_R * Math.sin(connRad);
+  const weX = Px + BACK_WALL_LEN * Math.cos(WALL_ANGLE_DEG * DEG2RAD);
+  const weY = Py + BACK_WALL_LEN * Math.sin(WALL_ANGLE_DEG * DEG2RAD);
+  const w2DirX = Math.cos(w2Angle), w2DirY = Math.sin(w2Angle);
+  const w2eX = weX + g.wallX * w2DirX, w2eY = weY + g.wallX * w2DirY;
+  const w3DirX = Math.cos(w3Angle), w3DirY = Math.sin(w3Angle);
+  const bCoef = 2 * (w2eX * w3DirX + w2eY * w3DirY);
+  const cCoef = w2eX * w2eX + w2eY * w2eY - DOME_R * DOME_R;
+  const disc = bCoef * bCoef - 4 * cCoef;
+  if (disc >= 0) {
+    const tHit = (-bCoef - Math.sqrt(disc)) / 2;
+    document.getElementById('sum-bottom').textContent = tHit.toFixed(1) + "'";
+  } else {
+    document.getElementById('sum-bottom').textContent = '--';
+  }
+
+  drawCrossSection(g);
+  drawFloorPlan(g);
+
+  // Update URL hash
+  history.replaceState(null, '', '#pitch=' + pitchDeg.toFixed(1));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Export / Share
+// ═══════════════════════════════════════════════════════════════
+function exportPNG(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  canvas.toBlob(function(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = canvasId + '-' + slider.value + 'deg.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function exportBoth() {
+  const cs = document.getElementById('cross-section');
+  const fp = document.getElementById('floor-plan');
+  const combined = document.createElement('canvas');
+  combined.width = cs.width + fp.width + 20;
+  combined.height = Math.max(cs.height, fp.height);
+  const ctx = combined.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, combined.width, combined.height);
+  ctx.drawImage(cs, 0, 0);
+  ctx.drawImage(fp, cs.width + 20, 0);
+  combined.toBlob(function(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hippie-hideout-' + slider.value + 'deg.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function shareLink() {
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(function() {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════
+const slider = document.getElementById('pitch-slider');
+
+// Restore from URL hash
+const hashMatch = window.location.hash.match(/pitch=([\d.]+)/);
+if (hashMatch) {
+  const v = parseFloat(hashMatch[1]);
+  if (v >= 20 && v <= 35) slider.value = v;
+}
+
+slider.addEventListener('input', update);
+window.addEventListener('resize', update);
+update();
+</script>
+</body>
+</html>
