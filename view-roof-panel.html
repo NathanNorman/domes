@@ -183,8 +183,8 @@
 <div class="summary">
   <div class="summary-grid">
     <div class="summary-item"><div class="label">Back Wall (ridge)</div><div class="val" id="sum-back">30.0'</div></div>
-    <div class="summary-item"><div class="label">Wing Wall</div><div class="val" id="sum-wing">--</div></div>
-    <div class="summary-item"><div class="label">Extension</div><div class="val" id="sum-ext">--</div></div>
+    <div class="summary-item"><div class="label">Wing Wall &mdash; surface (plan)</div><div class="val" id="sum-wing">--</div></div>
+    <div class="summary-item"><div class="label">Extension &mdash; surface (plan)</div><div class="val" id="sum-ext">--</div></div>
     <div class="summary-item"><div class="label">Inner Wall</div><div class="val" id="sum-bottom">--</div></div>
     <div class="summary-item"><div class="label">Dome Edge</div><div class="val" id="sum-dome">--</div></div>
     <div class="summary-item"><div class="label">Panel Area</div><div class="val" id="sum-area">--</div></div>
@@ -542,10 +542,11 @@ function drawPanel(g) {
   cx /= mv.length; cy /= mv.length;
 
   // Edge definitions (3 straight edges; inner wall + dome arc handled separately)
+  var sf = panel.stretchFactor;
   var edges = [
-    { from: 0, to: 1, len: panel.edgePW, label: 'Back wall (ridge)', color: '#2c3e50' },
-    { from: 1, to: 2, len: panel.edgeWW2, label: 'Wing wall', color: '#8e44ad' },
-    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension', color: '#d35400' }
+    { from: 0, to: 1, len: panel.edgePW, label: 'Back wall (ridge)', color: '#2c3e50', perp: false },
+    { from: 1, to: 2, len: panel.edgeWW2, label: 'Wing wall', color: '#8e44ad', perp: true },
+    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension', color: '#d35400', perp: true }
   ];
 
   for (var e = 0; e < edges.length; e++) {
@@ -625,11 +626,16 @@ function drawPanel(g) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(edge.len.toFixed(1) + "'", 0, 0);
+    if (edge.perp) {
+      ctx.font = '10px -apple-system, sans-serif';
+      ctx.fillStyle = '#888';
+      ctx.fillText('(' + (edge.len / sf).toFixed(1) + "' plan)", 0, 13);
+    }
     ctx.restore();
 
     // Edge name label (further out)
-    var nlx = mx + nx * (labelOff + 1.6);
-    var nly = my + ny * (labelOff + 1.6);
+    var nlx = mx + nx * (labelOff + (edge.perp ? 2.4 : 1.6));
+    var nly = my + ny * (labelOff + (edge.perp ? 2.4 : 1.6));
     ctx.save();
     ctx.translate(t.tx(nlx), t.ty(nly));
     ctx.rotate(-rotation);
@@ -805,12 +811,12 @@ function drawPanel(g) {
   ctx.font = '10px -apple-system, sans-serif';
   ctx.fillStyle = '#999';
   ctx.textAlign = 'left';
-  ctx.fillText('Plan-view shape stretched by 1/cos(pitch) perpendicular to back wall.  Dome edge follows dome curvature.', 12, h - 8);
+  ctx.fillText('Bold = true surface length along roof slope.  (plan) = horizontal plan-view length.  Sloped edges are longer by \u00D7' + sf.toFixed(3) + '.', 12, h - 8);
 
   // Update summary
   document.getElementById('sum-back').textContent = panel.edgePW.toFixed(1) + "'";
-  document.getElementById('sum-wing').textContent = panel.edgeWW2.toFixed(1) + "'";
-  document.getElementById('sum-ext').textContent = panel.edgeW2Post.toFixed(1) + "'";
+  document.getElementById('sum-wing').textContent = panel.edgeWW2.toFixed(1) + "' (" + (panel.edgeWW2 / sf).toFixed(1) + "')";
+  document.getElementById('sum-ext').textContent = panel.edgeW2Post.toFixed(1) + "' (" + (panel.edgeW2Post / sf).toFixed(1) + "')";
   document.getElementById('sum-bottom').textContent = panel.edgeW2W3.toFixed(1) + "'";
   document.getElementById('sum-dome').textContent = panel.domeArcLen.toFixed(1) + "' arc";
   document.getElementById('sum-area').textContent = panel.area.toFixed(0) + ' sf';
