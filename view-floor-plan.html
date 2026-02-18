@@ -150,8 +150,8 @@
 <div class="controls">
   <div class="slider-row">
     <label for="pitch-slider">Roof Pitch:</label>
-    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
-    <span class="value" id="pitch-value">20.0&deg;</span>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="25">
+    <span class="value" id="pitch-value">25.0&deg;</span>
   </div>
 </div>
 
@@ -308,15 +308,21 @@ function drawFloorPlan(g) {
   var wallAngle = WALL_ANGLE_DEG * DEG2RAD;
   var connRad = CONN_ANGLE_DEG * DEG2RAD;
 
-  // --- DOME ---
+  // --- DOME (entry opening removed) ---
+  var halfWidth = 4.0;
+  var yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
+  var entryAngleR = Math.atan2(yInt, halfWidth);
+  var entryAngleL = Math.atan2(yInt, -halfWidth);
+  // Draw the large arc from right entry point counterclockwise to left entry point
   ctx.beginPath();
+  var domeStart = entryAngleR;
+  var domeEnd = entryAngleL + 2 * Math.PI;
   for (var i = 0; i <= 500; i++) {
-    var a = (2 * Math.PI * i) / 500;
+    var a = domeStart + (domeEnd - domeStart) * (i / 500);
     var px = r * Math.cos(a), py = r * Math.sin(a);
     if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
     else ctx.lineTo(t.tx(px), t.ty(py));
   }
-  ctx.closePath();
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.stroke();
@@ -430,13 +436,36 @@ function drawFloorPlan(g) {
   drawText(ctx, t, mw2eLx - 1.5, mw2eLy + 1.5, "12' high", { color: '#666', size: 9, align: 'right' });
   drawText(ctx, t, mpeLx + 1.5, mpeLy - 1.5, "Post (8')", { color: '#333', size: 9 });
 
-  // --- FRONT RECTANGLE + ARC ---
-  var halfWidth = 4.0;
-  var yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
-  drawLine(ctx, t, -halfWidth, yInt, halfWidth, yInt, '#000', 2);
+  // --- FRONT ENTRY BOX ---
+  // halfWidth and yInt already defined above (dome section)
   drawDot(ctx, t, -halfWidth, yInt, 5);
   drawDot(ctx, t, halfWidth, yInt, 5);
 
+  // Dome face wall with 3' door opening centered
+  var doorHalf = 1.5;
+  drawLine(ctx, t, -halfWidth, yInt, -doorHalf, yInt, '#000', 2);
+  drawLine(ctx, t, doorHalf, yInt, halfWidth, yInt, '#000', 2);
+
+  // Door symbol: hinged on right, swings inward (into dome, upward)
+  var doorW = doorHalf * 2;
+  var hingeX = doorHalf, hingeY = yInt;
+  drawLine(ctx, t, hingeX, hingeY, hingeX, hingeY + doorW, '#555', 1.5);
+  ctx.beginPath();
+  var arcSteps = 30;
+  for (var di = 0; di <= arcSteps; di++) {
+    var da = Math.PI + (di / arcSteps) * (-Math.PI / 2);
+    var dx = hingeX + doorW * Math.cos(da);
+    var dy = hingeY + doorW * Math.sin(da);
+    if (di === 0) ctx.moveTo(t.tx(dx), t.ty(dy));
+    else ctx.lineTo(t.tx(dx), t.ty(dy));
+  }
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([3, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Entry box side walls and solid bottom wall
   var leftBot = [-halfWidth, yInt - 5];
   var rightBot = [halfWidth, yInt - 5];
   drawLine(ctx, t, -halfWidth, yInt, leftBot[0], leftBot[1], '#000', 2);
@@ -463,6 +492,27 @@ function drawFloorPlan(g) {
   ctx.globalAlpha = 0.5;
   ctx.stroke();
   ctx.globalAlpha = 1.0;
+
+  // --- ENTRYWAY CLOSETS ---
+  var entryDepthInside = 4.0;
+  var closetY = yInt + entryDepthInside;
+  var closetDomeX = Math.sqrt(r * r - closetY * closetY);
+
+  // Right closet: vertical wall then horizontal to dome
+  drawLine(ctx, t, halfWidth, yInt, halfWidth, closetY, '#000', 2);
+  drawLine(ctx, t, halfWidth, closetY, closetDomeX, closetY, '#000', 2);
+  drawDot(ctx, t, closetDomeX, closetY, 4);
+
+  // Left closet: mirror
+  drawLine(ctx, t, -halfWidth, yInt, -halfWidth, closetY, '#000', 2);
+  drawLine(ctx, t, -halfWidth, closetY, -closetDomeX, closetY, '#000', 2);
+  drawDot(ctx, t, -closetDomeX, closetY, 4);
+
+  // Closet labels (offset toward dome side to avoid wall overlap)
+  var closetLabelX = (halfWidth + closetDomeX) * 0.55;
+  var closetLabelY = (yInt + closetY) / 2;
+  drawText(ctx, t, closetLabelX, closetLabelY, 'Storage', { color: '#666', size: 9 });
+  drawText(ctx, t, -closetLabelX, closetLabelY, 'Storage', { color: '#666', size: 9 });
 
   // Title
   ctx.font = 'bold 14px -apple-system, sans-serif';
