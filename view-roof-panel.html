@@ -185,8 +185,9 @@
     <div class="summary-item"><div class="label">Back Wall (ridge)</div><div class="val" id="sum-back">30.0'</div></div>
     <div class="summary-item"><div class="label">Wing Wall &mdash; surface (plan)</div><div class="val" id="sum-wing">--</div></div>
     <div class="summary-item"><div class="label">Extension &mdash; surface (plan)</div><div class="val" id="sum-ext">--</div></div>
-    <div class="summary-item"><div class="label">Inner Wall</div><div class="val" id="sum-bottom">--</div></div>
+    <div class="summary-item"><div class="label">Porch Edge</div><div class="val" id="sum-porch">--</div></div>
     <div class="summary-item"><div class="label">Dome Edge</div><div class="val" id="sum-dome">--</div></div>
+    <div class="summary-item"><div class="label">Inner Wall</div><div class="val" id="sum-inner">--</div></div>
     <div class="summary-item"><div class="label">Panel Area</div><div class="val" id="sum-area">--</div></div>
   </div>
 </div>
@@ -234,6 +235,8 @@ var DOME_R = 16.5;
 var CONN_ANGLE_DEG = 20.0;
 var WALL_ANGLE_DEG = -25.0;
 var DEG2RAD = Math.PI / 180;
+var ENTRY_HALF_W = 4.0;
+var ENTRY_DEPTH = 5.0;
 
 // ===================================================================
 // Geometry Engine
@@ -332,44 +335,95 @@ function computeUnfoldedPanel(g) {
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  // --- Sample dome arc from W3 to P (curved dome edge) ---
-  var ARC_N = 40;
-  var arcAngleW3 = Math.atan2(W3y, W3x);
-  var arcAngleP = Math.atan2(Py, Px);
-  var arcSpan = arcAngleP - arcAngleW3;
-  while (arcSpan > Math.PI) arcSpan -= 2 * Math.PI;
-  while (arcSpan < -Math.PI) arcSpan += 2 * Math.PI;
+  // --- Porch arc geometry (matches floor plan front arc) ---
+  var yIntDome = -Math.sqrt(r * r - ENTRY_HALF_W * ENTRY_HALF_W);
+  var botY = yIntDome - ENTRY_DEPTH;
 
-  var arcPtsStretched = [];
-  for (var ai = 1; ai < ARC_N; ai++) {
-    var theta = arcAngleW3 + ai * arcSpan / ARC_N;
-    var ax = r * Math.cos(theta), ay = r * Math.sin(theta);
-    arcPtsStretched.push(stretchWorld(ax, ay));
+  // Arc centered on Y-axis, passing through Post and (0, botY)
+  var arcCy = (PostX * PostX + PostY * PostY - botY * botY) / (2 * (PostY - botY));
+  var porchRad = Math.abs(arcCy - botY);
+
+  // EntryDome: right entry box corner on dome circle
+  var EntryDomeX = ENTRY_HALF_W;
+  var EntryDomeY = yIntDome;
+  var sEntryDome = stretchWorld(EntryDomeX, EntryDomeY);
+
+  // PorchEnd: point on porch arc at x = ENTRY_HALF_W
+  var porchEndTheta = Math.acos(Math.min(1, ENTRY_HALF_W / porchRad));
+  var PorchEndX = porchRad * Math.cos(porchEndTheta);
+  var PorchEndY = arcCy + porchRad * Math.sin(porchEndTheta);
+
+  // --- Sample porch arc from Post to PorchEnd ---
+  var PORCH_N = 20;
+  var porchAnglePost = Math.atan2(PostY - arcCy, PostX);
+  var porchAnglePE = Math.atan2(PorchEndY - arcCy, PorchEndX);
+  var porchSpan = porchAnglePE - porchAnglePost;
+
+  var porchArcPts = [];
+  for (var pi = 1; pi <= PORCH_N; pi++) {
+    var theta = porchAnglePost + pi * porchSpan / PORCH_N;
+    var px = porchRad * Math.cos(theta);
+    var py = arcCy + porchRad * Math.sin(theta);
+    porchArcPts.push(stretchWorld(px, py));
   }
 
-  // Full polygon: 5 main vertices + dome arc samples (W3 → P)
-  var pts = [sP, sW, sW2, sPost, sW3].concat(arcPtsStretched);
-  var mainVerts = [sP, sW, sW2, sPost, sW3];
+  // Force entry wall to be vertical (same x as porch arc endpoint)
+  var lastPorch = porchArcPts[porchArcPts.length - 1];
+  sEntryDome = [lastPorch[0], sEntryDome[1]];
+
+  // --- Sample dome arc from EntryDome to P ---
+  var DOME_ARC_N = 40;
+  var domeAngleED = Math.atan2(EntryDomeY, EntryDomeX);
+  var domeAngleP = Math.atan2(Py, Px);
+  var domeSpan = domeAngleP - domeAngleED;
+  while (domeSpan > Math.PI) domeSpan -= 2 * Math.PI;
+  while (domeSpan < -Math.PI) domeSpan += 2 * Math.PI;
+
+  var domeArcPts = [];
+  for (var dai = 1; dai < DOME_ARC_N; dai++) {
+    var theta = domeAngleED + dai * domeSpan / DOME_ARC_N;
+    var ax = r * Math.cos(theta), ay = r * Math.sin(theta);
+    domeArcPts.push(stretchWorld(ax, ay));
+  }
+
+  // Full polygon: P → W → W2 → Post → [porchArc] → EntryDome → [domeArc] → P
+  var pts = [sP, sW, sW2, sPost]
+    .concat(porchArcPts)
+    .concat([sEntryDome])
+    .concat(domeArcPts);
+  var mainVerts = [sP, sW, sW2, sPost, sEntryDome];
 
   // --- Straight edge lengths ---
   var edgePW = dist(sP, sW);
   var edgeWW2 = dist(sW, sW2);
   var edgeW2Post = dist(sW2, sPost);
-  var edgePostW3 = dist(sPost, sW3);
   var edgeW2W3 = dist(sW2, sW3);
 
-  // --- Dome arc length (W3 → P, sum of segments in stretched space) ---
-  var domeArcLen = 0;
-  var arcPrev = sW3;
-  for (var ai = 0; ai < arcPtsStretched.length; ai++) {
-    domeArcLen += dist(arcPrev, arcPtsStretched[ai]);
-    arcPrev = arcPtsStretched[ai];
+  // --- Porch edge length (Post → porchArc → PorchEnd → EntryDome) ---
+  var porchEdgeLen = 0;
+  var prevPt = sPost;
+  for (var pi = 0; pi < porchArcPts.length; pi++) {
+    porchEdgeLen += dist(prevPt, porchArcPts[pi]);
+    prevPt = porchArcPts[pi];
   }
-  domeArcLen += dist(arcPrev, sP);
+  porchEdgeLen += dist(prevPt, sEntryDome);
 
-  var arcMidPt = arcPtsStretched[Math.floor(arcPtsStretched.length / 2)];
+  var porchMidPt = porchArcPts.length > 0
+    ? porchArcPts[Math.floor(porchArcPts.length / 2)] : sPost;
 
-  // --- Area via Shoelace formula on full polygon (with arc) ---
+  // --- Dome arc length (EntryDome → domeArc → P) ---
+  var domeArcLen = 0;
+  prevPt = sEntryDome;
+  for (var dai = 0; dai < domeArcPts.length; dai++) {
+    domeArcLen += dist(prevPt, domeArcPts[dai]);
+    prevPt = domeArcPts[dai];
+  }
+  domeArcLen += dist(prevPt, sP);
+
+  var domeMidPt = domeArcPts.length > 0
+    ? domeArcPts[Math.floor(domeArcPts.length / 2)] : sEntryDome;
+
+  // --- Area via Shoelace formula on full polygon ---
   var area = 0;
   for (var i = 0; i < pts.length; i++) {
     var j = (i + 1) % pts.length;
@@ -381,14 +435,15 @@ function computeUnfoldedPanel(g) {
   return {
     points: pts,
     mainVerts: mainVerts,
-    sP: sP, sW: sW, sW2: sW2, sPost: sPost, sW3: sW3,
+    sP: sP, sW: sW, sW2: sW2, sPost: sPost, sW3: sW3, sEntryDome: sEntryDome,
     edgePW: edgePW,
     edgeWW2: edgeWW2,
     edgeW2Post: edgeW2Post,
-    edgePostW3: edgePostW3,
     edgeW2W3: edgeW2W3,
+    porchEdgeLen: porchEdgeLen,
     domeArcLen: domeArcLen,
-    arcMidPt: arcMidPt,
+    porchMidPt: porchMidPt,
+    domeMidPt: domeMidPt,
     area: area,
     stretchFactor: stretchFactor
   };
@@ -516,8 +571,7 @@ function drawPanel(g) {
   var edges = [
     { from: 0, to: 1, len: panel.edgePW, label: 'Back wall (ridge)', color: '#2c3e50', perp: false },
     { from: 1, to: 2, len: panel.edgeWW2, label: 'Wing wall', color: '#8e44ad', perp: true },
-    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension', color: '#d35400', perp: true },
-    { from: 3, to: 4, len: panel.edgePostW3, label: 'Porch edge', color: '#7f8c8d', perp: false }
+    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension', color: '#d35400', perp: true }
   ];
 
   for (var e = 0; e < edges.length; e++) {
@@ -698,30 +752,45 @@ function drawPanel(g) {
     }
   })();
 
-  // Dome arc label (curved edge, handled separately from straight edges)
-  if (panel.arcMidPt) {
-    var amp = panel.arcMidPt;
-    // Normal at arc midpoint: point away from centroid
-    var anx = amp[0] - cx, any = amp[1] - cy;
-    var anLen = Math.sqrt(anx * anx + any * any);
-    if (anLen > 0.001) { anx /= anLen; any /= anLen; }
+  // Porch edge label (curved)
+  if (panel.porchMidPt) {
+    var pmp = panel.porchMidPt;
+    var pnx = pmp[0] - cx, pny = pmp[1] - cy;
+    var pnLen = Math.sqrt(pnx * pnx + pny * pny);
+    if (pnLen > 0.001) { pnx /= pnLen; pny /= pnLen; }
+    var porchColor = '#7f8c8d';
+    var pLabelOff = 2.5;
+    ctx.font = 'bold 13px -apple-system, sans-serif';
+    ctx.fillStyle = porchColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(panel.porchEdgeLen.toFixed(1) + "' arc", t.tx(pmp[0] + pnx * pLabelOff), t.ty(pmp[1] + pny * pLabelOff));
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = '#888';
+    ctx.fillText('Porch edge (curved)', t.tx(pmp[0] + pnx * (pLabelOff + 1.6)), t.ty(pmp[1] + pny * (pLabelOff + 1.6)));
+  }
+
+  // Dome arc label (curved)
+  if (panel.domeMidPt) {
+    var dmp = panel.domeMidPt;
+    var dnx = dmp[0] - cx, dny = dmp[1] - cy;
+    var dnLen = Math.sqrt(dnx * dnx + dny * dny);
+    if (dnLen > 0.001) { dnx /= dnLen; dny /= dnLen; }
     var domeColor = '#16a085';
     var dLabelOff = 2.5;
-    // Length label
     ctx.font = 'bold 13px -apple-system, sans-serif';
     ctx.fillStyle = domeColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(panel.domeArcLen.toFixed(1) + "' arc", t.tx(amp[0] + anx * dLabelOff), t.ty(amp[1] + any * dLabelOff));
-    // Name label
+    ctx.fillText(panel.domeArcLen.toFixed(1) + "' arc", t.tx(dmp[0] + dnx * dLabelOff), t.ty(dmp[1] + dny * dLabelOff));
     ctx.font = '10px -apple-system, sans-serif';
     ctx.fillStyle = '#888';
-    ctx.fillText('Dome edge (curved)', t.tx(amp[0] + anx * (dLabelOff + 1.6)), t.ty(amp[1] + any * (dLabelOff + 1.6)));
+    ctx.fillText('Dome edge (curved)', t.tx(dmp[0] + dnx * (dLabelOff + 1.6)), t.ty(dmp[1] + dny * (dLabelOff + 1.6)));
   }
 
   // Corner dots and labels
-  var cornerNames = ['P', 'W', 'W2', 'Post', 'W3'];
-  var cornerDescs = ['dome conn (20\')', 'back wall end (20\')', 'wing wall (12\')', 'outer post (8\')', 'dome intersect (12\')'];
+  var cornerNames = ['P', 'W', 'W2', 'Post', 'Entry'];
+  var cornerDescs = ['dome conn (20\')', 'back wall end (20\')', 'wing wall (12\')', 'outer post (8\')', 'entry/dome jn'];
   var cornerColors = ['#27ae60', '#2c3e50', '#8e44ad', '#d35400', '#16a085'];
 
   for (var c = 0; c < 5; c++) {
@@ -786,8 +855,9 @@ function drawPanel(g) {
   document.getElementById('sum-back').textContent = panel.edgePW.toFixed(1) + "'";
   document.getElementById('sum-wing').textContent = panel.edgeWW2.toFixed(1) + "' (" + (panel.edgeWW2 / sf).toFixed(1) + "')";
   document.getElementById('sum-ext').textContent = panel.edgeW2Post.toFixed(1) + "' (" + (panel.edgeW2Post / sf).toFixed(1) + "')";
-  document.getElementById('sum-bottom').textContent = panel.edgeW2W3.toFixed(1) + "'";
+  document.getElementById('sum-porch').textContent = panel.porchEdgeLen.toFixed(1) + "' arc";
   document.getElementById('sum-dome').textContent = panel.domeArcLen.toFixed(1) + "' arc";
+  document.getElementById('sum-inner').textContent = panel.edgeW2W3.toFixed(1) + "'";
   document.getElementById('sum-area').textContent = panel.area.toFixed(0) + ' sf';
 
   // Material summary
