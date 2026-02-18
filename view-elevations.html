@@ -554,6 +554,23 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
       drawLine(ctx, t, pB, hB, pC, hC, color, 2.5);
     }
 
+    // Near side wall (C→A, slopes 8'→20') — porch-facing
+    if (Math.abs(t.tx(pC) - t.tx(pA)) >= 3) {
+      ctx.save();
+      ctx.globalAlpha = 0.1;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(t.tx(pC), t.ty(0));
+      ctx.lineTo(t.tx(pA), t.ty(0));
+      ctx.lineTo(t.tx(pA), t.ty(hA));
+      ctx.lineTo(t.tx(pC), t.ty(hC));
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+      ctx.restore();
+      drawLine(ctx, t, pC, hC, pA, hA, color, 2.5);
+    }
+
     // Corner at B + connection dot at A
     if (Math.abs(t.tx(pA) - t.tx(pB)) >= 3)
       drawLine(ctx, t, pB, 0, pB, hB, color, 1.5);
@@ -594,10 +611,11 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
     var cy = (A.wy + B.wy + C.wy) / 3;
     var tvx = sinA, tvy = -cosA;
 
-    // Back wall (A→B, 20') and side wall (B→C, 20'→8')
+    // Back wall (A→B, 20'), far side (B→C, 20'→8'), near side (C→A, 8'→20')
     var wallDefs = [
       { p1: A, p2: B, h1: LEFT_WALL_H, h2: LEFT_WALL_H, color: '#B8A888' },
-      { p1: B, p2: C, h1: LEFT_WALL_H, h2: RIGHT_POST_H, color: '#A89878' }
+      { p1: B, p2: C, h1: LEFT_WALL_H, h2: RIGHT_POST_H, color: '#A89878' },
+      { p1: C, p2: A, h1: RIGHT_POST_H, h2: LEFT_WALL_H, color: '#C8B898' }
     ];
     wallDefs.forEach(function(wd) {
       var n = outwardNormal(wd.p1, wd.p2, cx, cy);
