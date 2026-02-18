@@ -626,16 +626,11 @@ function drawPanel(g) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(edge.len.toFixed(1) + "'", 0, 0);
-    if (edge.perp) {
-      ctx.font = '10px -apple-system, sans-serif';
-      ctx.fillStyle = '#888';
-      ctx.fillText('(' + (edge.len / sf).toFixed(1) + "' plan)", 0, 13);
-    }
     ctx.restore();
 
     // Edge name label (further out)
-    var nlx = mx + nx * (labelOff + (edge.perp ? 2.4 : 1.6));
-    var nly = my + ny * (labelOff + (edge.perp ? 2.4 : 1.6));
+    var nlx = mx + nx * (labelOff + 1.6);
+    var nly = my + ny * (labelOff + 1.6);
     ctx.save();
     ctx.translate(t.tx(nlx), t.ty(nly));
     ctx.rotate(-rotation);
@@ -643,7 +638,9 @@ function drawPanel(g) {
     ctx.fillStyle = '#888';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(edge.label, 0, 0);
+    var nameText = edge.label;
+    if (edge.perp) nameText += ' (' + (edge.len / sf).toFixed(1) + "' plan)";
+    ctx.fillText(nameText, 0, 0);
     ctx.restore();
   }
 
