@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hippie Hideout — Geometry Tools</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+    min-height: 100vh;
+  }
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 32px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.8em; font-weight: 700; letter-spacing: 0.02em; }
+  header p { font-size: 0.95em; opacity: 0.7; margin-top: 6px; }
+
+  .cards {
+    max-width: 900px;
+    margin: 24px auto;
+    padding: 0 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 20px;
+    text-decoration: none;
+    color: #333;
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: block;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  .card h2 {
+    font-size: 1.1em;
+    color: #2c3e50;
+    margin-bottom: 6px;
+  }
+  .card p {
+    font-size: 0.85em;
+    color: #666;
+    line-height: 1.4;
+  }
+  .card .tag {
+    display: inline-block;
+    background: #ecf0f1;
+    color: #2c3e50;
+    font-size: 0.7em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-top: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  footer {
+    text-align: center;
+    padding: 24px;
+    color: #999;
+    font-size: 0.8em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hippie Hideout</h1>
+  <p>Interactive geometry tools for dome + wing design</p>
+</header>
+
+<div class="cards">
+  <a class="card" href="all-views.html" style="grid-column: 1 / -1; background: #2c3e50; color: white;">
+    <h2 style="color: white;">All Views — Synced</h2>
+    <p style="color: rgba(255,255,255,0.8);">Every view on one page with a single master slider. Slide the pitch and watch all diagrams update together in real time.</p>
+    <span class="tag" style="background: rgba(255,255,255,0.2); color: white;">Master Dashboard</span>
+  </a>
+
+  <a class="card" href="geometry-explorer.html">
+    <h2>Geometry Explorer</h2>
+    <p>Cross-section and floor plan views driven by roof pitch angle. The main interactive tool with dimension labels and wing geometry.</p>
+    <span class="tag">Cross-Section + Floor Plan</span>
+  </a>
+
+  <a class="card" href="view-height-profile.html">
+    <h2>Height Profile + Wing Area</h2>
+    <p>Ceiling height graph as you walk through the wing. Shows usable vs. unusable area based on 6'8" minimum clearance.</p>
+    <span class="tag">Livability Analysis</span>
+  </a>
+
+  <a class="card" href="view-comparison.html">
+    <h2>Pitch Comparison</h2>
+    <p>Side-by-side cross-sections at two different pitch angles with a delta table showing the differences.</p>
+    <span class="tag">Decision Tool</span>
+  </a>
+
+  <a class="card" href="view-elevations.html">
+    <h2>Front Elevation + Junction</h2>
+    <p>What the structure looks like from the front, plus a zoomed detail of where the wing roof meets the dome shell.</p>
+    <span class="tag">Construction Detail</span>
+  </a>
+
+  <a class="card" href="view-roof-panel.html">
+    <h2>Unfolded Roof Panel</h2>
+    <p>The wing roof surface laid flat with true dimensions. Shows the actual shape to cut from roofing material with waste calculations.</p>
+    <span class="tag">Material Planning</span>
+  </a>
+
+  <a class="card" href="dome-viewer.html">
+    <h2>3D Dome Viewer</h2>
+    <p>Full 3D Three.js viewer with adjustable wing parameters, camera presets, cutaway mode, and interior elements.</p>
+    <span class="tag">3D Interactive</span>
+  </a>
+</div>
+
+<footer>
+  All tools use roof pitch angle (20&deg;&ndash;35&deg;) as the primary parameter. Share any view via URL hash.
+</footer>
+
+</body>
+</html>

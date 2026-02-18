@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hippie Hideout — Wing Height Profile &amp; Area</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+    min-height: 100vh;
+  }
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 16px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.4em; font-weight: 600; letter-spacing: 0.02em; }
+  header p { font-size: 0.85em; opacity: 0.7; margin-top: 4px; }
+
+  .canvas-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .canvas-wrap {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 8px;
+    flex: 1 1 600px;
+    max-width: 900px;
+    min-width: 320px;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .controls {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 16px 8px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .slider-row label {
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: #2c3e50;
+    height: 6px;
+  }
+  .slider-row .value {
+    font-weight: 700;
+    font-size: 1.1em;
+    min-width: 42px;
+    text-align: right;
+    color: #c0392b;
+  }
+
+  .summary {
+    max-width: 900px;
+    margin: 8px auto;
+    padding: 0 16px;
+  }
+  .summary-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 12px 20px;
+    justify-content: center;
+  }
+  .summary-item {
+    text-align: center;
+    min-width: 120px;
+  }
+  .summary-item .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-item .val { font-size: 1.3em; font-weight: 700; color: #2c3e50; }
+  .summary-item .val.green { color: #27ae60; }
+  .summary-item .val.red { color: #c0392b; }
+
+  .area-panel {
+    max-width: 900px;
+    margin: 8px auto;
+    padding: 0 16px 16px;
+  }
+  .area-grid {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 16px 20px;
+  }
+  .area-grid h3 {
+    font-size: 0.95em;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .area-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 0.95em;
+  }
+  .area-row:last-child { border-bottom: none; }
+  .area-row .area-label { color: #666; }
+  .area-row .area-val { font-weight: 700; color: #2c3e50; }
+  .area-row .area-val.green { color: #27ae60; }
+
+  .actions {
+    text-align: center;
+    padding: 12px;
+  }
+  .actions button {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    cursor: pointer;
+    margin: 0 4px;
+    transition: background 0.2s;
+  }
+  .actions button:hover { background: #34495e; }
+
+  @media (max-width: 768px) {
+    .canvas-row { flex-direction: column; align-items: center; padding: 8px; gap: 8px; }
+    .canvas-wrap { max-width: 100%; flex: 0 0 auto; }
+    header h1 { font-size: 1.1em; }
+    header { padding: 10px 16px; }
+    .controls { padding: 0 8px 4px; }
+    .summary { padding: 0 8px; }
+    .summary-grid { padding: 8px 12px; gap: 8px; }
+    .summary-item .val { font-size: 1.1em; }
+    .area-panel { padding: 0 8px 12px; }
+    .actions { padding: 8px; }
+    .actions button { padding: 6px 12px; font-size: 0.8em; }
+  }
+  @media print {
+    header { background: white; color: black; }
+    .controls, .actions { display: none; }
+    .canvas-wrap { box-shadow: none; border: 1px solid #ccc; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hippie Hideout — Wing Height Profile &amp; Area</h1>
+  <p>Ceiling height cross-section and usable wing area by roof pitch</p>
+</header>
+
+<div class="canvas-row">
+  <div class="canvas-wrap">
+    <canvas id="height-profile" width="1600" height="900"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="slider-row">
+    <label for="pitch-slider">Roof Pitch:</label>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
+    <span class="value" id="pitch-value">20.0&deg;</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-grid">
+    <div class="summary-item"><div class="label">Horiz Span</div><div class="val" id="sum-span">--</div></div>
+    <div class="summary-item"><div class="label">Rafter Len</div><div class="val" id="sum-rafter">--</div></div>
+    <div class="summary-item"><div class="label">Interior Wall At</div><div class="val" id="sum-wallx">--</div></div>
+    <div class="summary-item"><div class="label">Min Clearance At</div><div class="val" id="sum-clearx">--</div></div>
+    <div class="summary-item"><div class="label">Pitch</div><div class="val" id="sum-pitch">--</div></div>
+  </div>
+</div>
+
+<div class="area-panel">
+  <div class="area-grid">
+    <h3>Wing Area (per wing)</h3>
+    <div class="area-row">
+      <span class="area-label">Total Wing Floor Area</span>
+      <span class="area-val" id="area-total">--</span>
+    </div>
+    <div class="area-row">
+      <span class="area-label">Usable Area (ceiling &ge; 6&prime;8&Prime;)</span>
+      <span class="area-val green" id="area-usable">--</span>
+    </div>
+    <div class="area-row">
+      <span class="area-label">Unusable Area (ceiling &lt; 6&prime;8&Prime;)</span>
+      <span class="area-val" id="area-unusable">--</span>
+    </div>
+    <div class="area-row">
+      <span class="area-label">Usable Percentage</span>
+      <span class="area-val green" id="area-pct">--</span>
+    </div>
+  </div>
+</div>
+
+<div class="actions">
+  <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="shareLink()">Copy Share Link</button>
+</div>
+
+<script>
+// ===================================================================
+// Constants
+// ===================================================================
+const LEFT_WALL_H = 20.0;
+const RIGHT_POST_H = 8.0;
+const ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
+const INTERIOR_WALL_H = 12.0;
+const BACK_WALL_LEN = 30.0;
+const DOME_R = 16.5;
+const MIN_CLEARANCE = 6 + 8/12; // 6'8" = 6.667 feet
+
+const DEG2RAD = Math.PI / 180;
+
+// ===================================================================
+// Geometry Engine
+// ===================================================================
+function computeGeometry(pitchDeg) {
+  var rad = pitchDeg * DEG2RAD;
+  var horizSpan = ROOF_DROP / Math.tan(rad);
+  var wallX = (LEFT_WALL_H - INTERIOR_WALL_H) / Math.tan(rad);
+  var rafterLen = ROOF_DROP / Math.sin(rad);
+  var rightSection = horizSpan - wallX;
+
+  // x-position where ceiling height = MIN_CLEARANCE
+  // ceiling(x) = LEFT_WALL_H - x * tan(rad) ... solving for ceiling = MIN_CLEARANCE
+  var clearanceX = (LEFT_WALL_H - MIN_CLEARANCE) / Math.tan(rad);
+
+  return {
+    pitchDeg: pitchDeg,
+    rad: rad,
+    horizSpan: horizSpan,
+    wallX: wallX,
+    rafterLen: rafterLen,
+    rightSection: rightSection,
+    clearanceX: clearanceX
+  };
+}
+
+// Ceiling height at distance x from dome wall
+function ceilingAt(x, geo) {
+  return LEFT_WALL_H - x * Math.tan(geo.rad);
+}
+
+// ===================================================================
+// Wing area calculation
+// ===================================================================
+function computeWingArea(geo) {
+  // The wing in floor plan is approximated as a trapezoid:
+  // - One parallel side: back wall (BACK_WALL_LEN = 30')
+  // - Other parallel side: the far edge at horizSpan
+  // - Width (perpendicular distance): horizSpan
+  // For a simpler useful approximation, treat it as a rectangle-ish shape.
+  //
+  // More precisely: the wing room (dome wall to interior wall) has width wallX
+  // and the extension past interior wall has width rightSection.
+  // The back wall length (30') is constant along the full span.
+  //
+  // Total floor area of one wing = horizSpan * BACK_WALL_LEN (rectangular approx)
+  // But the wing tapers - the dome side has the full back wall length,
+  // and the post side also has approximately the back wall length.
+  //
+  // Using the simple rectangle: area = horizSpan * backWall
+  var totalArea = geo.horizSpan * BACK_WALL_LEN;
+
+  // Usable area: area where ceiling >= 6'8", which is from x=0 to x=clearanceX
+  var usableSpan = Math.min(geo.clearanceX, geo.horizSpan);
+  var usableArea = usableSpan * BACK_WALL_LEN;
+
+  var unusableArea = totalArea - usableArea;
+  var pct = totalArea > 0 ? (usableArea / totalArea * 100) : 0;
+
+  return {
+    totalArea: totalArea,
+    usableArea: usableArea,
+    unusableArea: unusableArea,
+    pct: pct
+  };
+}
+
+// ===================================================================
+// Canvas Drawing
+// ===================================================================
+var canvas = document.getElementById('height-profile');
+var ctx = canvas.getContext('2d');
+
+function draw(pitchDeg) {
+  var geo = computeGeometry(pitchDeg);
+  var areas = computeWingArea(geo);
+  var W = canvas.width;
+  var H = canvas.height;
+  var dpr = window.devicePixelRatio || 1;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Drawing margins
+  var marginL = 90;
+  var marginR = 40;
+  var marginT = 40;
+  var marginB = 60;
+  var plotW = W - marginL - marginR;
+  var plotH = H - marginT - marginB;
+
+  // Axis ranges
+  var xMax = Math.ceil(geo.horizSpan / 5) * 5 + 5; // round up to next 5, plus padding
+  if (xMax < geo.horizSpan + 2) xMax += 5;
+  var yMax = 22;
+  var yMin = 0;
+
+  function toCanvasX(x) { return marginL + (x / xMax) * plotW; }
+  function toCanvasY(y) { return marginT + ((yMax - y) / (yMax - yMin)) * plotH; }
+
+  // ---- Grid lines ----
+  ctx.save();
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+
+  // Vertical grid (every 5 ft)
+  for (var gx = 0; gx <= xMax; gx += 5) {
+    var cx = toCanvasX(gx);
+    ctx.beginPath();
+    ctx.moveTo(cx, marginT);
+    ctx.lineTo(cx, marginT + plotH);
+    ctx.stroke();
+  }
+  // Horizontal grid (every 5 ft on Y, plus some extras)
+  for (var gy = 0; gy <= yMax; gy += 5) {
+    var cy = toCanvasY(gy);
+    ctx.beginPath();
+    ctx.moveTo(marginL, cy);
+    ctx.lineTo(marginL + plotW, cy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ---- Shaded regions ----
+  var clampedClearanceX = Math.min(geo.clearanceX, geo.horizSpan);
+  var clampedHorizSpan = geo.horizSpan;
+
+  // Usable area (green) - from x=0 to clearanceX, between floor and ceiling
+  ctx.save();
+  ctx.fillStyle = 'rgba(46, 204, 113, 0.15)';
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(0), toCanvasY(0));
+  ctx.lineTo(toCanvasX(0), toCanvasY(LEFT_WALL_H));
+  ctx.lineTo(toCanvasX(clampedClearanceX), toCanvasY(ceilingAt(clampedClearanceX, geo)));
+  ctx.lineTo(toCanvasX(clampedClearanceX), toCanvasY(0));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Unusable area (red) - from clearanceX to horizSpan, between floor and ceiling
+  if (geo.clearanceX < geo.horizSpan) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.12)';
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(clampedClearanceX), toCanvasY(0));
+    ctx.lineTo(toCanvasX(clampedClearanceX), toCanvasY(ceilingAt(clampedClearanceX, geo)));
+    ctx.lineTo(toCanvasX(clampedHorizSpan), toCanvasY(RIGHT_POST_H));
+    ctx.lineTo(toCanvasX(clampedHorizSpan), toCanvasY(0));
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ---- Ceiling line (roof slope) ----
+  ctx.save();
+  ctx.strokeStyle = '#2c3e50';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(0), toCanvasY(LEFT_WALL_H));
+  ctx.lineTo(toCanvasX(clampedHorizSpan), toCanvasY(RIGHT_POST_H));
+  ctx.stroke();
+  ctx.restore();
+
+  // ---- Floor line ----
+  ctx.save();
+  ctx.strokeStyle = '#7f8c8d';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(0), toCanvasY(0));
+  ctx.lineTo(toCanvasX(clampedHorizSpan), toCanvasY(0));
+  ctx.stroke();
+  ctx.restore();
+
+  // ---- Dome wall (left vertical) ----
+  ctx.save();
+  ctx.strokeStyle = '#2c3e50';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(0), toCanvasY(0));
+  ctx.lineTo(toCanvasX(0), toCanvasY(LEFT_WALL_H));
+  ctx.stroke();
+  ctx.restore();
+
+  // ---- Post (right vertical) ----
+  ctx.save();
+  ctx.strokeStyle = '#2c3e50';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(clampedHorizSpan), toCanvasY(0));
+  ctx.lineTo(toCanvasX(clampedHorizSpan), toCanvasY(RIGHT_POST_H));
+  ctx.stroke();
+  ctx.restore();
+
+  // ---- Min clearance line (6'8") ----
+  ctx.save();
+  ctx.strokeStyle = '#e67e22';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath();
+  ctx.moveTo(marginL, toCanvasY(MIN_CLEARANCE));
+  ctx.lineTo(marginL + plotW, toCanvasY(MIN_CLEARANCE));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Label
+  ctx.fillStyle = '#e67e22';
+  ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText("Min Clearance 6'8\"", marginL + 8, toCanvasY(MIN_CLEARANCE) - 8);
+  ctx.restore();
+
+  // ---- Interior wall position ----
+  if (geo.wallX <= geo.horizSpan) {
+    ctx.save();
+    ctx.strokeStyle = '#8e44ad';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(geo.wallX), marginT);
+    ctx.lineTo(toCanvasX(geo.wallX), marginT + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Label
+    ctx.fillStyle = '#8e44ad';
+    ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText("Interior Wall (12')", toCanvasX(geo.wallX), marginT - 10);
+    ctx.restore();
+  }
+
+  // ---- Clearance crossing marker ----
+  if (geo.clearanceX <= geo.horizSpan) {
+    ctx.save();
+    // Vertical line at clearance crossing
+    ctx.strokeStyle = '#e67e22';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(clampedClearanceX), toCanvasY(0));
+    ctx.lineTo(toCanvasX(clampedClearanceX), toCanvasY(MIN_CLEARANCE));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dot at crossing point
+    ctx.fillStyle = '#e67e22';
+    ctx.beginPath();
+    ctx.arc(toCanvasX(clampedClearanceX), toCanvasY(MIN_CLEARANCE), 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(clampedClearanceX.toFixed(1) + "'", toCanvasX(clampedClearanceX), toCanvasY(0) + 22);
+    ctx.restore();
+  }
+
+  // ---- Endpoint labels ----
+  ctx.save();
+  ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = '#2c3e50';
+  ctx.textAlign = 'center';
+  // Left wall height
+  ctx.fillText(LEFT_WALL_H.toFixed(0) + "'", toCanvasX(0) - 30, toCanvasY(LEFT_WALL_H) + 6);
+  // Right post height
+  ctx.fillText(RIGHT_POST_H.toFixed(0) + "'", toCanvasX(clampedHorizSpan) + 28, toCanvasY(RIGHT_POST_H) + 6);
+  ctx.restore();
+
+  // ---- Axes ----
+  ctx.save();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  // Y-axis
+  ctx.beginPath();
+  ctx.moveTo(marginL, marginT);
+  ctx.lineTo(marginL, marginT + plotH);
+  ctx.stroke();
+  // X-axis
+  ctx.beginPath();
+  ctx.moveTo(marginL, marginT + plotH);
+  ctx.lineTo(marginL + plotW, marginT + plotH);
+  ctx.stroke();
+  ctx.restore();
+
+  // ---- Axis tick labels ----
+  ctx.save();
+  ctx.fillStyle = '#666';
+  ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
+
+  // X-axis ticks
+  ctx.textAlign = 'center';
+  for (var tx = 0; tx <= xMax; tx += 5) {
+    ctx.fillText(tx + "'", toCanvasX(tx), marginT + plotH + 28);
+  }
+
+  // Y-axis ticks
+  ctx.textAlign = 'right';
+  for (var ty = 0; ty <= yMax; ty += 5) {
+    ctx.fillText(ty + "'", marginL - 10, toCanvasY(ty) + 6);
+  }
+  ctx.restore();
+
+  // ---- Axis titles ----
+  ctx.save();
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('Distance from Dome Wall (feet)', marginL + plotW / 2, H - 8);
+
+  ctx.save();
+  ctx.translate(22, marginT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Height (feet)', 0, 0);
+  ctx.restore();
+  ctx.restore();
+
+  // ---- Title ----
+  ctx.save();
+  ctx.fillStyle = '#2c3e50';
+  ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('Roof Pitch: ' + pitchDeg.toFixed(1) + '\u00B0', W - marginR, marginT - 10);
+  ctx.restore();
+
+  // ---- Legend ----
+  ctx.save();
+  var legendX = marginL + plotW - 280;
+  var legendY = marginT + 20;
+
+  ctx.fillStyle = 'rgba(46, 204, 113, 0.3)';
+  ctx.fillRect(legendX, legendY, 18, 14);
+  ctx.fillStyle = '#333';
+  ctx.font = '18px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText("Usable (\u2265 6'8\")", legendX + 24, legendY + 12);
+
+  ctx.fillStyle = 'rgba(231, 76, 60, 0.25)';
+  ctx.fillRect(legendX, legendY + 24, 18, 14);
+  ctx.fillStyle = '#333';
+  ctx.fillText("Unusable (< 6'8\")", legendX + 24, legendY + 36);
+  ctx.restore();
+
+  // ---- Update summary ----
+  document.getElementById('sum-span').textContent = geo.horizSpan.toFixed(1) + "'";
+  document.getElementById('sum-rafter').textContent = geo.rafterLen.toFixed(1) + "'";
+  document.getElementById('sum-wallx').textContent = geo.wallX.toFixed(1) + "'";
+  document.getElementById('sum-clearx').textContent = clampedClearanceX.toFixed(1) + "'";
+  document.getElementById('sum-pitch').textContent = pitchDeg.toFixed(1) + '\u00B0';
+
+  // ---- Update area panel ----
+  document.getElementById('area-total').textContent = areas.totalArea.toFixed(0) + ' sq ft';
+  document.getElementById('area-usable').textContent = areas.usableArea.toFixed(0) + ' sq ft';
+  document.getElementById('area-unusable').textContent = areas.unusableArea.toFixed(0) + ' sq ft';
+  document.getElementById('area-pct').textContent = areas.pct.toFixed(1) + '%';
+}
+
+// ===================================================================
+// Slider Interaction
+// ===================================================================
+var slider = document.getElementById('pitch-slider');
+var pitchLabel = document.getElementById('pitch-value');
+
+function onSliderChange() {
+  var pitchDeg = parseFloat(slider.value);
+  pitchLabel.innerHTML = pitchDeg.toFixed(1) + '&deg;';
+  draw(pitchDeg);
+}
+
+slider.addEventListener('input', onSliderChange);
+
+// URL hash state
+function loadFromHash() {
+  var params = new URLSearchParams(window.location.hash.slice(1));
+  var p = parseFloat(params.get('pitch'));
+  if (!isNaN(p) && p >= 20 && p <= 35) {
+    slider.value = p;
+  }
+}
+
+function shareLink() {
+  var url = window.location.href.split('#')[0] + '#pitch=' + slider.value;
+  navigator.clipboard.writeText(url).then(function() {
+    alert('Link copied to clipboard');
+  });
+}
+
+function exportPNG() {
+  var link = document.createElement('a');
+  link.download = 'height-profile-' + parseFloat(slider.value).toFixed(1) + 'deg.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// ===================================================================
+// Init
+// ===================================================================
+loadFromHash();
+
+// Listen for pitch changes from parent (iframe sync)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'setPitch') {
+    var v = parseFloat(e.data.value);
+    if (!isNaN(v) && v >= 20 && v <= 35) { slider.value = v; onSliderChange(); }
+  }
+});
+
+onSliderChange();
+</script>
+</body>
+</html>

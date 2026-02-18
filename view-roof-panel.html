@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hippie Hideout — Unfolded Roof Panel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+    min-height: 100vh;
+  }
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 16px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.4em; font-weight: 600; letter-spacing: 0.02em; }
+  header p { font-size: 0.85em; opacity: 0.7; margin-top: 4px; }
+
+  .canvas-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .canvas-wrap {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 8px;
+    flex: 1 1 600px;
+    max-width: 900px;
+    min-width: 320px;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: crosshair;
+  }
+
+  .controls {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 16px 8px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .slider-row label {
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: #2c3e50;
+    height: 6px;
+  }
+  .slider-row .value {
+    font-weight: 700;
+    font-size: 1.1em;
+    min-width: 42px;
+    text-align: right;
+    color: #c0392b;
+  }
+
+  .summary {
+    max-width: 900px;
+    margin: 8px auto;
+    padding: 0 16px;
+  }
+  .summary-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 12px 20px;
+    justify-content: center;
+  }
+  .summary-item {
+    text-align: center;
+    min-width: 100px;
+  }
+  .summary-item .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-item .val { font-size: 1.3em; font-weight: 700; color: #2c3e50; }
+
+  .material-box {
+    max-width: 900px;
+    margin: 8px auto;
+    padding: 0 16px 16px;
+  }
+  .material-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 16px 20px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .material-card .mat-item {
+    text-align: center;
+  }
+  .material-card .mat-label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .material-card .mat-val { font-size: 1.5em; font-weight: 700; color: #c0392b; }
+  .material-card .mat-note { font-size: 0.8em; color: #999; margin-top: 2px; }
+
+  .actions {
+    text-align: center;
+    padding: 12px;
+  }
+  .actions button {
+    background: #2c3e50;
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    font-size: 0.85em;
+    cursor: pointer;
+    margin: 0 4px;
+    transition: background 0.2s;
+  }
+  .actions button:hover { background: #34495e; }
+
+  @media (max-width: 768px) {
+    .canvas-row { flex-direction: column; align-items: center; padding: 8px; gap: 8px; }
+    .canvas-wrap { max-width: 100%; flex: 0 0 auto; }
+    header h1 { font-size: 1.1em; }
+    header { padding: 10px 16px; }
+    .controls { padding: 0 8px 4px; }
+    .summary { padding: 0 8px; }
+    .summary-grid { padding: 8px 12px; gap: 8px; }
+    .summary-item .val { font-size: 1.1em; }
+    .material-box { padding: 0 8px 8px; }
+    .material-card { padding: 12px; gap: 16px; }
+    .actions { padding: 8px; }
+    .actions button { padding: 6px 12px; font-size: 0.8em; }
+  }
+  @media print {
+    header { background: white; color: black; }
+    .controls, .actions { display: none; }
+    .canvas-wrap { box-shadow: none; border: 1px solid #ccc; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hippie Hideout — Unfolded Roof Panel</h1>
+  <p>True-dimension roof surface laid flat for material cutting</p>
+</header>
+
+<div class="canvas-row">
+  <div class="canvas-wrap">
+    <canvas id="panel" width="1400" height="1000"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="slider-row">
+    <label for="pitch-slider">Roof Pitch:</label>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="20">
+    <span class="value" id="pitch-value">20.0&deg;</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-grid">
+    <div class="summary-item"><div class="label">Back Wall (top)</div><div class="val" id="sum-back">30.0'</div></div>
+    <div class="summary-item"><div class="label">Wing Wall Edge</div><div class="val" id="sum-wing">--</div></div>
+    <div class="summary-item"><div class="label">Extension Edge</div><div class="val" id="sum-ext">--</div></div>
+    <div class="summary-item"><div class="label">Rafter (dome)</div><div class="val" id="sum-rafter">--</div></div>
+    <div class="summary-item"><div class="label">Panel Area</div><div class="val" id="sum-area">--</div></div>
+  </div>
+</div>
+
+<div class="material-box">
+  <div class="material-card">
+    <div class="mat-item">
+      <div class="mat-label">Panel Area</div>
+      <div class="mat-val" id="mat-area">--</div>
+      <div class="mat-note">sq ft</div>
+    </div>
+    <div class="mat-item">
+      <div class="mat-label">+ 10% Waste</div>
+      <div class="mat-val" id="mat-waste">--</div>
+      <div class="mat-note">sq ft</div>
+    </div>
+    <div class="mat-item">
+      <div class="mat-label">Material Needed</div>
+      <div class="mat-val" id="mat-total">--</div>
+      <div class="mat-note">sq ft (total)</div>
+    </div>
+    <div class="mat-item">
+      <div class="mat-label">Roofing Squares</div>
+      <div class="mat-val" id="mat-squares">--</div>
+      <div class="mat-note">1 square = 100 sq ft</div>
+    </div>
+  </div>
+</div>
+
+<div class="actions">
+  <button onclick="exportPNG()">Export PNG</button>
+  <button onclick="shareLink()">Copy Share Link</button>
+</div>
+
+<script>
+// ===================================================================
+// Constants
+// ===================================================================
+var LEFT_WALL_H = 20.0;
+var RIGHT_POST_H = 8.0;
+var ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
+var INTERIOR_WALL_H = 12.0;
+var BACK_WALL_LEN = 30.0;
+var DOME_R = 16.5;
+var CONN_ANGLE_DEG = 20.0;
+var WALL_ANGLE_DEG = -25.0;
+var DEG2RAD = Math.PI / 180;
+
+// ===================================================================
+// Geometry Engine
+// ===================================================================
+function computeGeometry(pitchDeg) {
+  var rad = pitchDeg * DEG2RAD;
+  var horizSpan = ROOF_DROP / Math.tan(rad);
+  var wallX = (LEFT_WALL_H - INTERIOR_WALL_H) / Math.tan(rad);
+  var rafterLen = ROOF_DROP / Math.sin(rad);
+  var rightSection = horizSpan - wallX;
+  return { pitchDeg: pitchDeg, rad: rad, horizSpan: horizSpan, wallX: wallX, rafterLen: rafterLen, rightSection: rightSection };
+}
+
+// ===================================================================
+// Unfolded Panel Geometry
+//
+// The roof quadrilateral has four corners: P, W, W2, Post
+// - P -> W: along the back wall top, both at 20'. Plan length = 30'. True length = 30'
+// - W -> W2: slopes from 20' to 12' over plan distance wallX. True length = sqrt(wallX^2 + 8^2)
+// - W2 -> Post: slopes from 12' to 8' over plan distance rightSection. True length = sqrt(rightSection^2 + 4^2)
+// - Post -> P: the rafter/dome edge. True length = rafterLen = 12/sin(pitch)
+//
+// To unfold: lay back wall (P->W = 30') horizontal as the top edge.
+// Then reconstruct the quad using true edge lengths and the angles
+// between edges in 3D.
+// ===================================================================
+
+function computeUnfoldedPanel(g) {
+  // True edge lengths
+  var edgePW = BACK_WALL_LEN; // 30'
+  var edgeWW2 = Math.sqrt(g.wallX * g.wallX + 8 * 8);
+  var edgeW2Post = Math.sqrt(g.rightSection * g.rightSection + 4 * 4);
+  var edgePostP = g.rafterLen;
+
+  // To unfold we need to know the angles between consecutive edges in the
+  // roof plane. We can compute this from the 3D positions of the four points.
+  //
+  // Plan-view coordinates:
+  var connRad = CONN_ANGLE_DEG * DEG2RAD;
+  var wallRad = WALL_ANGLE_DEG * DEG2RAD;
+  var Px = DOME_R * Math.cos(connRad);
+  var Py = DOME_R * Math.sin(connRad);
+  var Wx = Px + BACK_WALL_LEN * Math.cos(wallRad);
+  var Wy = Py + BACK_WALL_LEN * Math.sin(wallRad);
+  var perpAngle = wallRad - Math.PI / 2;
+  var perpDx = Math.cos(perpAngle);
+  var perpDy = Math.sin(perpAngle);
+  var W2x = Wx + g.wallX * perpDx;
+  var W2y = Wy + g.wallX * perpDy;
+  var PostX = W2x + g.rightSection * perpDx;
+  var PostY = W2y + g.rightSection * perpDy;
+
+  // 3D coordinates (add Z = height)
+  var P3 = [Px, Py, LEFT_WALL_H];
+  var W3 = [Wx, Wy, LEFT_WALL_H];
+  var W23 = [W2x, W2y, INTERIOR_WALL_H];
+  var Post3 = [PostX, PostY, RIGHT_POST_H];
+
+  // Compute interior angles at each vertex using 3D vectors
+  function vec3sub(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+  function dot3(a, b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+  function len3(a) { return Math.sqrt(dot3(a, a)); }
+  function angle3(a, vertex, b) {
+    var va = vec3sub(a, vertex);
+    var vb = vec3sub(b, vertex);
+    var cosA = dot3(va, vb) / (len3(va) * len3(vb));
+    return Math.acos(Math.max(-1, Math.min(1, cosA)));
+  }
+
+  var angleP = angle3(Post3, P3, W3);    // angle at P between edges Post->P and P->W
+  var angleW = angle3(P3, W3, W23);       // angle at W between edges P->W and W->W2
+  var angleW2 = angle3(W3, W23, Post3);   // angle at W2 between edges W->W2 and W2->Post
+  var anglePost = angle3(W23, Post3, P3); // angle at Post between edges W2->Post and Post->P
+
+  // Now unfold: place P at origin, W to the right along x-axis
+  // P = (0, 0), W = (30, 0)
+  var uP = [0, 0];
+  var uW = [edgePW, 0];
+
+  // From W, edge W->W2 goes at angle (pi - angleW) below the back wall direction
+  // Back wall direction from W back to P is angle = pi (pointing left)
+  // The edge W->W2 is at angle (pi - angleW) measured from the P->W direction
+  // From W, direction to P is angle = pi. Interior angle at W means W->W2 is at angle pi + angleW below.
+  // Actually: from W, the direction to P is angle = pi. The interior angle is between W->P and W->W2.
+  // So W->W2 direction = pi - angleW (measuring clockwise from P direction).
+  // Since we want the panel to go "downward" (negative y), the angle from +x axis is:
+  var dirWW2 = Math.PI + angleW; // from W, relative to +x axis, going below
+  var uW2 = [uW[0] + edgeWW2 * Math.cos(dirWW2), uW[1] + edgeWW2 * Math.sin(dirWW2)];
+
+  // From W2, edge W2->Post: interior angle at W2 is between W2->W and W2->Post
+  // Direction from W2 to W:
+  var dirW2W = Math.atan2(uW[1] - uW2[1], uW[0] - uW2[0]);
+  // Interior angle at W2: W->W2->Post
+  // W2->Post is at angle (dirW2W - angleW2) going clockwise (panel extends outward)
+  // Actually we need to be careful about orientation. The quad P-W-W2-Post should wind consistently.
+  // Let's try: from W2->W direction, rotate by -angleW2 (clockwise when panel goes below)
+  var dirW2Post = dirW2W - angleW2;
+  var uPost = [uW2[0] + edgeW2Post * Math.cos(dirW2Post), uW2[1] + edgeW2Post * Math.sin(dirW2Post)];
+
+  // Verification: distance from Post to P should equal edgePostP
+  var closureDist = Math.sqrt((uPost[0] - uP[0]) * (uPost[0] - uP[0]) + (uPost[1] - uP[1]) * (uPost[1] - uP[1]));
+
+  // Compute area using Shoelace formula
+  var pts = [uP, uW, uW2, uPost];
+  var area = 0;
+  for (var i = 0; i < 4; i++) {
+    var j = (i + 1) % 4;
+    area += pts[i][0] * pts[j][1];
+    area -= pts[j][0] * pts[i][1];
+  }
+  area = Math.abs(area) / 2;
+
+  // Corner angles in degrees for display
+  var cornerAngles = [
+    { name: 'P (Dome)', angle: angleP * 180 / Math.PI },
+    { name: 'W (Back wall end)', angle: angleW * 180 / Math.PI },
+    { name: 'W2 (Interior wall)', angle: angleW2 * 180 / Math.PI },
+    { name: 'Post', angle: anglePost * 180 / Math.PI }
+  ];
+
+  return {
+    points: pts,
+    uP: uP, uW: uW, uW2: uW2, uPost: uPost,
+    edgePW: edgePW, edgeWW2: edgeWW2, edgeW2Post: edgeW2Post, edgePostP: edgePostP,
+    area: area,
+    closureDist: closureDist,
+    cornerAngles: cornerAngles
+  };
+}
+
+// ===================================================================
+// Drawing Utilities
+// ===================================================================
+function setupCanvas(canvas) {
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx: ctx, w: rect.width, h: rect.height };
+}
+
+function makeTransform(w, h, xMin, xMax, yMin, yMax) {
+  var padX = 0.08 * w, padY = 0.08 * h;
+  var drawW = w - 2 * padX;
+  var drawH = h - 2 * padY;
+  var scaleX = drawW / (xMax - xMin);
+  var scaleY = drawH / (yMax - yMin);
+  var scale = Math.min(scaleX, scaleY);
+  var offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
+  var offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
+  return {
+    tx: function(x) { return offsetX + (x - xMin) * scale; },
+    ty: function(y) { return h - (offsetY + (y - yMin) * scale); },
+    scale: scale
+  };
+}
+
+// ===================================================================
+// Panel Renderer
+// ===================================================================
+function drawPanel(g) {
+  var canvas = document.getElementById('panel');
+  var setup = setupCanvas(canvas);
+  var ctx = setup.ctx, w = setup.w, h = setup.h;
+  var panel = computeUnfoldedPanel(g);
+  var pts = panel.points;
+
+  // Find bounding box with padding
+  var xs = pts.map(function(p) { return p[0]; });
+  var ys = pts.map(function(p) { return p[1]; });
+  var xMin = Math.min.apply(null, xs) - 4;
+  var xMax = Math.max.apply(null, xs) + 4;
+  var yMin = Math.min.apply(null, ys) - 5;
+  var yMax = Math.max.apply(null, ys) + 4;
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+
+  // Background
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  // Light grid
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 0.5;
+  var gridStep = 5;
+  for (var gx = Math.ceil(xMin / gridStep) * gridStep; gx <= xMax; gx += gridStep) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(gx), t.ty(yMin));
+    ctx.lineTo(t.tx(gx), t.ty(yMax));
+    ctx.stroke();
+  }
+  for (var gy = Math.ceil(yMin / gridStep) * gridStep; gy <= yMax; gy += gridStep) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(xMin), t.ty(gy));
+    ctx.lineTo(t.tx(xMax), t.ty(gy));
+    ctx.stroke();
+  }
+
+  // Fill panel shape
+  ctx.beginPath();
+  ctx.moveTo(t.tx(pts[0][0]), t.ty(pts[0][1]));
+  for (var i = 1; i < pts.length; i++) {
+    ctx.lineTo(t.tx(pts[i][0]), t.ty(pts[i][1]));
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
+  ctx.fill();
+
+  // Stroke panel outline
+  ctx.beginPath();
+  ctx.moveTo(t.tx(pts[0][0]), t.ty(pts[0][1]));
+  for (var i = 1; i < pts.length; i++) {
+    ctx.lineTo(t.tx(pts[i][0]), t.ty(pts[i][1]));
+  }
+  ctx.closePath();
+  ctx.strokeStyle = '#2c3e50';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Edge labels with dimension lines
+  var edges = [
+    { from: 0, to: 1, len: panel.edgePW, label: 'Back wall (top edge)', color: '#2c3e50' },
+    { from: 1, to: 2, len: panel.edgeWW2, label: 'Wing wall edge', color: '#8e44ad' },
+    { from: 2, to: 3, len: panel.edgeW2Post, label: 'Extension edge', color: '#d35400' },
+    { from: 3, to: 0, len: panel.edgePostP, label: 'Rafter (dome edge)', color: '#27ae60' }
+  ];
+
+  for (var e = 0; e < edges.length; e++) {
+    var edge = edges[e];
+    var p1 = pts[edge.from];
+    var p2 = pts[edge.to];
+    var mx = (p1[0] + p2[0]) / 2;
+    var my = (p1[1] + p2[1]) / 2;
+    var dx = p2[0] - p1[0];
+    var dy = p2[1] - p1[1];
+    var edgeLen = Math.sqrt(dx * dx + dy * dy);
+
+    // Perpendicular offset for label (outward from panel center)
+    var cx = 0, cy = 0;
+    for (var k = 0; k < 4; k++) { cx += pts[k][0] / 4; cy += pts[k][1] / 4; }
+    var nx = -dy / edgeLen;
+    var ny = dx / edgeLen;
+    // Make sure normal points away from center
+    var toCenter = (cx - mx) * nx + (cy - my) * ny;
+    if (toCenter > 0) { nx = -nx; ny = -ny; }
+
+    var labelOff = 2.2;
+
+    // Draw hash marks at ends
+    var hashLen = 0.6;
+    ctx.strokeStyle = edge.color;
+    ctx.lineWidth = 1.5;
+    // Hash at p1
+    ctx.beginPath();
+    ctx.moveTo(t.tx(p1[0] + nx * hashLen), t.ty(p1[1] + ny * hashLen));
+    ctx.lineTo(t.tx(p1[0] - nx * hashLen), t.ty(p1[1] - ny * hashLen));
+    ctx.stroke();
+    // Hash at p2
+    ctx.beginPath();
+    ctx.moveTo(t.tx(p2[0] + nx * hashLen), t.ty(p2[1] + ny * hashLen));
+    ctx.lineTo(t.tx(p2[0] - nx * hashLen), t.ty(p2[1] - ny * hashLen));
+    ctx.stroke();
+
+    // Dimension line offset from edge
+    var dimOff = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(t.tx(p1[0] + nx * dimOff), t.ty(p1[1] + ny * dimOff));
+    ctx.lineTo(t.tx(p2[0] + nx * dimOff), t.ty(p2[1] + ny * dimOff));
+    ctx.strokeStyle = edge.color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrowheads on dimension line
+    var sx1 = t.tx(p1[0] + nx * dimOff), sy1 = t.ty(p1[1] + ny * dimOff);
+    var sx2 = t.tx(p2[0] + nx * dimOff), sy2 = t.ty(p2[1] + ny * dimOff);
+    var aAngle = Math.atan2(sy2 - sy1, sx2 - sx1);
+    var headLen = 7;
+    ctx.strokeStyle = edge.color;
+    ctx.lineWidth = 1.2;
+    // Arrow at start
+    ctx.beginPath();
+    ctx.moveTo(sx1, sy1);
+    ctx.lineTo(sx1 + headLen * Math.cos(aAngle - 0.4), sy1 + headLen * Math.sin(aAngle - 0.4));
+    ctx.moveTo(sx1, sy1);
+    ctx.lineTo(sx1 + headLen * Math.cos(aAngle + 0.4), sy1 + headLen * Math.sin(aAngle + 0.4));
+    ctx.stroke();
+    // Arrow at end
+    var aAngle2 = aAngle + Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(sx2, sy2);
+    ctx.lineTo(sx2 + headLen * Math.cos(aAngle2 - 0.4), sy2 + headLen * Math.sin(aAngle2 - 0.4));
+    ctx.moveTo(sx2, sy2);
+    ctx.lineTo(sx2 + headLen * Math.cos(aAngle2 + 0.4), sy2 + headLen * Math.sin(aAngle2 + 0.4));
+    ctx.stroke();
+
+    // Length label
+    var lx = mx + nx * labelOff;
+    var ly = my + ny * labelOff;
+    var rotation = Math.atan2(dy, dx);
+    // Keep text right-side up
+    if (rotation > Math.PI / 2 || rotation < -Math.PI / 2) rotation += Math.PI;
+    ctx.save();
+    ctx.translate(t.tx(lx), t.ty(ly));
+    ctx.rotate(-rotation);
+    ctx.font = 'bold 13px -apple-system, sans-serif';
+    ctx.fillStyle = edge.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(edge.len.toFixed(1) + "'", 0, 0);
+    ctx.restore();
+
+    // Edge name label (further out)
+    var nlx = mx + nx * (labelOff + 1.5);
+    var nly = my + ny * (labelOff + 1.5);
+    ctx.save();
+    ctx.translate(t.tx(nlx), t.ty(nly));
+    ctx.rotate(-rotation);
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = '#888';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(edge.label, 0, 0);
+    ctx.restore();
+  }
+
+  // Corner dots and angle labels
+  var cornerNames = ['P', 'W', 'W2', 'Post'];
+  var cornerColors = ['#27ae60', '#2c3e50', '#8e44ad', '#d35400'];
+  for (var c = 0; c < 4; c++) {
+    var pt = pts[c];
+    // Dot
+    ctx.beginPath();
+    ctx.arc(t.tx(pt[0]), t.ty(pt[1]), 5, 0, 2 * Math.PI);
+    ctx.fillStyle = cornerColors[c];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Corner label and angle
+    var prev = pts[(c + 3) % 4];
+    var next = pts[(c + 1) % 4];
+    // Direction away from adjacent edges (bisector outward)
+    var toP = [prev[0] - pt[0], prev[1] - pt[1]];
+    var toN = [next[0] - pt[0], next[1] - pt[1]];
+    var lP = Math.sqrt(toP[0] * toP[0] + toP[1] * toP[1]);
+    var lN = Math.sqrt(toN[0] * toN[0] + toN[1] * toN[1]);
+    toP[0] /= lP; toP[1] /= lP;
+    toN[0] /= lN; toN[1] /= lN;
+    var bisX = toP[0] + toN[0];
+    var bisY = toP[1] + toN[1];
+    var bisLen = Math.sqrt(bisX * bisX + bisY * bisY);
+    if (bisLen < 0.001) { bisX = -toP[1]; bisY = toP[0]; bisLen = 1; }
+    bisX /= bisLen; bisY /= bisLen;
+    // Make sure bisector points outward (away from centroid)
+    var cx2 = 0, cy2 = 0;
+    for (var k = 0; k < 4; k++) { cx2 += pts[k][0] / 4; cy2 += pts[k][1] / 4; }
+    var toCent = (cx2 - pt[0]) * bisX + (cy2 - pt[1]) * bisY;
+    if (toCent > 0) { bisX = -bisX; bisY = -bisY; }
+
+    var off = 2.5;
+    ctx.font = 'bold 12px -apple-system, sans-serif';
+    ctx.fillStyle = cornerColors[c];
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cornerNames[c], t.tx(pt[0] + bisX * off), t.ty(pt[1] + bisY * off));
+
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = '#666';
+    ctx.fillText(panel.cornerAngles[c].angle.toFixed(1) + '\u00B0', t.tx(pt[0] + bisX * (off + 1.3)), t.ty(pt[1] + bisY * (off + 1.3)));
+
+    // Draw angle arc at corner
+    var arcR = 1.5 * (t.scale || 1) / (t.scale || 1); // 1.5 feet
+    var startAngle = Math.atan2(toP[1], toP[0]);
+    var endAngle = Math.atan2(toN[1], toN[0]);
+    // Ensure we draw the interior arc (smaller angle)
+    var diff = endAngle - startAngle;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    ctx.beginPath();
+    if (diff > 0) {
+      ctx.arc(t.tx(pt[0]), t.ty(pt[1]), arcR * t.scale, -startAngle, -endAngle, true);
+    } else {
+      ctx.arc(t.tx(pt[0]), t.ty(pt[1]), arcR * t.scale, -startAngle, -endAngle, false);
+    }
+    ctx.strokeStyle = cornerColors[c];
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Title
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.fillText('Unfolded Roof Panel (True Dimensions)', w / 2, 22);
+
+  // Subtitle
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.fillText('Pitch: ' + g.pitchDeg.toFixed(1) + '\u00B0  |  Area: ' + panel.area.toFixed(1) + ' sq ft  |  Closure error: ' + Math.abs(panel.closureDist - panel.edgePostP).toFixed(2) + "'", w / 2, 40);
+
+  // Edge attachment notes
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = '#999';
+  ctx.textAlign = 'left';
+  ctx.fillText('P = Dome connection point  |  W = Back wall end  |  W2 = Interior wall  |  Post = Outer support post', 12, h - 8);
+
+  // Update summary
+  document.getElementById('sum-back').textContent = panel.edgePW.toFixed(1) + "'";
+  document.getElementById('sum-wing').textContent = panel.edgeWW2.toFixed(1) + "'";
+  document.getElementById('sum-ext').textContent = panel.edgeW2Post.toFixed(1) + "'";
+  document.getElementById('sum-rafter').textContent = panel.edgePostP.toFixed(1) + "'";
+  document.getElementById('sum-area').textContent = panel.area.toFixed(1) + ' sf';
+
+  // Material summary
+  var waste = panel.area * 0.10;
+  var total = panel.area + waste;
+  document.getElementById('mat-area').textContent = panel.area.toFixed(0);
+  document.getElementById('mat-waste').textContent = waste.toFixed(0);
+  document.getElementById('mat-total').textContent = total.toFixed(0);
+  document.getElementById('mat-squares').textContent = (total / 100).toFixed(2);
+
+  return panel;
+}
+
+// ===================================================================
+// Update Loop
+// ===================================================================
+function update() {
+  var pitchDeg = parseFloat(slider.value);
+  var g = computeGeometry(pitchDeg);
+  document.getElementById('pitch-value').textContent = pitchDeg.toFixed(1) + '\u00B0';
+  drawPanel(g);
+  history.replaceState(null, '', '#pitch=' + pitchDeg.toFixed(1));
+}
+
+// ===================================================================
+// Export / Share
+// ===================================================================
+function exportPNG() {
+  var canvas = document.getElementById('panel');
+  canvas.toBlob(function(blob) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'roof-panel-' + slider.value + 'deg.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function shareLink() {
+  var url = window.location.href;
+  navigator.clipboard.writeText(url).then(function() {
+    var btns = document.querySelectorAll('.actions button');
+    var btn = btns[1];
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  });
+}
+
+// ===================================================================
+// Init
+// ===================================================================
+var slider = document.getElementById('pitch-slider');
+
+// Restore from URL hash
+var hashMatch = window.location.hash.match(/pitch=([\d.]+)/);
+if (hashMatch) {
+  var v = parseFloat(hashMatch[1]);
+  if (v >= 20 && v <= 35) slider.value = v;
+}
+
+slider.addEventListener('input', update);
+window.addEventListener('resize', update);
+
+// Listen for pitch changes from parent (iframe sync)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'setPitch') {
+    var v = parseFloat(e.data.value);
+    if (v >= 20 && v <= 35) { slider.value = v; update(); }
+  }
+});
+
+update();
+</script>
+</body>
+</html>

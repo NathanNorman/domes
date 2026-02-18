@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Front Elevation + Junction Detail</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+    min-height: 100vh;
+  }
+  header {
+    background: #2c3e50;
+    color: white;
+    padding: 16px 24px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.4em; font-weight: 600; letter-spacing: 0.02em; }
+  header p { font-size: 0.85em; opacity: 0.7; margin-top: 4px; }
+
+  .canvas-row {
+    display: flex;
+    gap: 12px;
+    padding: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .canvas-wrap {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 8px;
+    flex: 1 1 500px;
+    max-width: 700px;
+    min-width: 320px;
+  }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: crosshair;
+  }
+
+  .controls {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 16px 8px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .slider-row label {
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: #2c3e50;
+    height: 6px;
+  }
+  .slider-row .value {
+    font-weight: 700;
+    font-size: 1.1em;
+    min-width: 42px;
+    text-align: right;
+    color: #c0392b;
+  }
+
+  .summary {
+    max-width: 1420px;
+    margin: 8px auto;
+    padding: 0 16px;
+  }
+  .summary-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding: 12px 20px;
+    justify-content: center;
+  }
+  .summary-item {
+    text-align: center;
+    min-width: 100px;
+  }
+  .summary-item .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-item .val { font-size: 1.3em; font-weight: 700; color: #2c3e50; }
+
+  @media (max-width: 768px) {
+    .canvas-row { flex-direction: column; align-items: center; padding: 8px; gap: 8px; }
+    .canvas-wrap { max-width: 100%; flex: 0 0 auto; }
+    header h1 { font-size: 1.1em; }
+    header { padding: 10px 16px; }
+    .controls { padding: 0 8px 4px; }
+    .summary { padding: 0 8px; }
+    .summary-grid { padding: 8px 12px; gap: 8px; }
+    .summary-item .val { font-size: 1.1em; }
+  }
+  @media print {
+    header { background: white; color: black; }
+    .controls { display: none; }
+    .canvas-wrap { box-shadow: none; border: 1px solid #ccc; }
+    body { background: white; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Front Elevation + Junction Detail</h1>
+  <p>Dome with wings from the front, and a zoomed junction where the wing roof meets the dome</p>
+</header>
+
+<div class="canvas-row">
+  <div class="canvas-wrap">
+    <canvas id="front-elevation" width="1400" height="900"></canvas>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="junction-detail" width="1400" height="900"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="slider-row">
+    <label for="pitch-slider">Roof Pitch:</label>
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="25">
+    <span class="value" id="pitch-value">25.0&deg;</span>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-grid">
+    <div class="summary-item"><div class="label">Pitch</div><div class="val" id="sum-pitch">25.0&deg;</div></div>
+    <div class="summary-item"><div class="label">Connection Ht</div><div class="val" id="sum-conn-ht">--</div></div>
+    <div class="summary-item"><div class="label">Horiz Span</div><div class="val" id="sum-span">--</div></div>
+    <div class="summary-item"><div class="label">Rafter</div><div class="val" id="sum-rafter">--</div></div>
+    <div class="summary-item"><div class="label">Junction Angle</div><div class="val" id="sum-junction">--</div></div>
+  </div>
+</div>
+
+<script>
+// ===================================================================
+// Constants
+// ===================================================================
+const LEFT_WALL_H = 20.0;
+const RIGHT_POST_H = 8.0;
+const ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
+const BACK_WALL_LEN = 30.0;
+const DOME_R = 16.5;
+const CONN_ANGLE_DEG = 20.0;
+const WALL_ANGLE_DEG = -25.0;
+
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
+// ===================================================================
+// Geometry Engine
+// ===================================================================
+function computeGeometry(pitchDeg) {
+  const rad = pitchDeg * DEG2RAD;
+  const horizSpan = ROOF_DROP / Math.tan(rad);
+  const wallX = (LEFT_WALL_H - 12.0) / Math.tan(rad);
+  const rafterLen = ROOF_DROP / Math.sin(rad);
+  const rightSection = horizSpan - wallX;
+  return { pitchDeg, rad, horizSpan, wallX, rafterLen, rightSection };
+}
+
+// ===================================================================
+// Drawing Utilities
+// ===================================================================
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+function makeTransform(w, h, xMin, xMax, yMin, yMax) {
+  const padX = 0.08 * w, padY = 0.08 * h;
+  const drawW = w - 2 * padX;
+  const drawH = h - 2 * padY;
+  const scaleX = drawW / (xMax - xMin);
+  const scaleY = drawH / (yMax - yMin);
+  const scale = Math.min(scaleX, scaleY);
+  const offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
+  const offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
+  return {
+    tx: (x) => offsetX + (x - xMin) * scale,
+    ty: (y) => h - (offsetY + (y - yMin) * scale),
+    scale,
+  };
+}
+
+function drawLine(ctx, t, x1, y1, x2, y2, color, lw) {
+  ctx.beginPath();
+  ctx.moveTo(t.tx(x1), t.ty(y1));
+  ctx.lineTo(t.tx(x2), t.ty(y2));
+  ctx.strokeStyle = color || '#000';
+  ctx.lineWidth = lw || 2;
+  ctx.stroke();
+}
+
+function drawDot(ctx, t, x, y, r, color) {
+  ctx.beginPath();
+  ctx.arc(t.tx(x), t.ty(y), r || 4, 0, 2 * Math.PI);
+  ctx.fillStyle = color || '#000';
+  ctx.fill();
+}
+
+function drawText(ctx, t, x, y, text, opts) {
+  opts = opts || {};
+  ctx.save();
+  ctx.font = (opts.weight || 'bold') + ' ' + (opts.size || 12) + 'px -apple-system, sans-serif';
+  ctx.fillStyle = opts.color || '#333';
+  ctx.textAlign = opts.align || 'center';
+  ctx.textBaseline = opts.baseline || 'middle';
+  var sx = t.tx(x), sy = t.ty(y);
+  if (opts.rotation) {
+    ctx.translate(sx, sy);
+    ctx.rotate(-opts.rotation * DEG2RAD);
+    ctx.fillText(text, 0, 0);
+  } else {
+    ctx.fillText(text, sx, sy);
+  }
+  ctx.restore();
+}
+
+function drawArc(ctx, t, cx, cy, r, startDeg, endDeg, color, lw) {
+  var steps = 120;
+  var s0 = startDeg * DEG2RAD;
+  var s1 = endDeg * DEG2RAD;
+  ctx.beginPath();
+  for (var i = 0; i <= steps; i++) {
+    var a = s0 + (s1 - s0) * i / steps;
+    var px = cx + r * Math.cos(a);
+    var py = cy + r * Math.sin(a);
+    if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
+    else ctx.lineTo(t.tx(px), t.ty(py));
+  }
+  ctx.strokeStyle = color || '#000';
+  ctx.lineWidth = lw || 2;
+  ctx.stroke();
+}
+
+function drawFilledArc(ctx, t, cx, cy, r, startDeg, endDeg, fillColor) {
+  var steps = 60;
+  var s0 = startDeg * DEG2RAD;
+  var s1 = endDeg * DEG2RAD;
+  ctx.beginPath();
+  ctx.moveTo(t.tx(cx), t.ty(cy));
+  for (var i = 0; i <= steps; i++) {
+    var a = s0 + (s1 - s0) * i / steps;
+    var px = cx + r * Math.cos(a);
+    var py = cy + r * Math.sin(a);
+    ctx.lineTo(t.tx(px), t.ty(py));
+  }
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+}
+
+function drawDimArrow(ctx, t, x1, y1, x2, y2, label, color, side) {
+  // Dimension line with arrowheads and label
+  var sx1 = t.tx(x1), sy1 = t.ty(y1);
+  var sx2 = t.tx(x2), sy2 = t.ty(y2);
+  var headLen = 6;
+  var angle = Math.atan2(sy2 - sy1, sx2 - sx1);
+  var c = color || '#555';
+
+  ctx.beginPath();
+  ctx.moveTo(sx1, sy1);
+  ctx.lineTo(sx2, sy2);
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Arrowheads
+  for (var k = 0; k < 2; k++) {
+    var sx = k === 0 ? sx1 : sx2;
+    var sy = k === 0 ? sy1 : sy2;
+    var dir = k === 0 ? 1 : -1;
+    var a = angle + dir * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + headLen * Math.cos(a - 0.4), sy + headLen * Math.sin(a - 0.4));
+    ctx.lineTo(sx + headLen * Math.cos(a + 0.4), sy + headLen * Math.sin(a + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = c;
+    ctx.fill();
+  }
+
+  // Label
+  var mx = (sx1 + sx2) / 2;
+  var my = (sy1 + sy2) / 2;
+  var offset = side === 'left' ? -14 : (side === 'right' ? 14 : -10);
+  ctx.save();
+  ctx.font = 'bold 11px -apple-system, sans-serif';
+  ctx.fillStyle = c;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // For vertical lines, offset horizontally; for horizontal, offset vertically
+  var dx = Math.abs(sx2 - sx1);
+  var dy = Math.abs(sy2 - sy1);
+  if (dy > dx) {
+    ctx.fillText(label, mx + offset, my);
+  } else {
+    ctx.fillText(label, mx, my + offset);
+  }
+  ctx.restore();
+}
+
+// ===================================================================
+// Front Elevation
+// ===================================================================
+function drawFrontElevation(pitchDeg) {
+  var canvas = document.getElementById('front-elevation');
+  var s = setupCanvas(canvas);
+  var ctx = s.ctx, w = s.w, h = s.h;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Title
+  ctx.save();
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillStyle = '#2c3e50';
+  ctx.textAlign = 'center';
+  ctx.fillText('Front Elevation (Looking South)', w / 2, 20);
+  ctx.restore();
+
+  var geo = computeGeometry(pitchDeg);
+
+  // Dome geometry
+  var domeCX = 0;
+  var domeCY = 0; // dome center at ground level; dome is a hemisphere sitting on ground
+  var domeR = DOME_R;
+
+  // Connection point at CONN_ANGLE_DEG above horizontal on dome circle
+  var connAngle = CONN_ANGLE_DEG * DEG2RAD;
+  var connX = domeR * Math.cos(connAngle);
+  var connY = domeR * Math.sin(connAngle);
+  var connHeight = connY; // height above ground
+
+  // Wing outer edge: post at 8' height, lateral distance ~25' from center
+  // The wing extends along a wall angle; from front, approximate the lateral extent
+  var wingLateralExtent = 25; // feet from center to outer post
+  var wingOuterY = RIGHT_POST_H;
+
+  // World bounds
+  var xMin = -wingLateralExtent - 5;
+  var xMax = wingLateralExtent + 5;
+  var yMin = -3;
+  var yMax = domeR + 5;
+
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+
+  // Ground
+  drawLine(ctx, t, xMin + 1, 0, xMax - 1, 0, '#8B7355', 2);
+
+  // Ground fill
+  ctx.save();
+  ctx.fillStyle = '#f0ead6';
+  var gx1 = t.tx(xMin + 1), gy1 = t.ty(0);
+  var gx2 = t.tx(xMax - 1), gy2 = t.ty(-2);
+  ctx.fillRect(gx1, gy1, gx2 - gx1, gy2 - gy1);
+  ctx.restore();
+
+  // Ground line label
+  drawText(ctx, t, 0, -1.5, 'GROUND', { size: 10, color: '#8B7355', weight: '600' });
+
+  // Dome shell (semicircle from 0 to 180 degrees)
+  ctx.save();
+  // Fill dome with light blue
+  drawFilledArc(ctx, t, domeCX, domeCY, domeR, 0, 180, 'rgba(173, 216, 230, 0.15)');
+  // Dome outline
+  drawArc(ctx, t, domeCX, domeCY, domeR, 0, 180, '#2c3e50', 2.5);
+  ctx.restore();
+
+  // Entry box (centered, 8' wide, 9' tall)
+  var entryW = 8;
+  var entryH = 9;
+  ctx.save();
+  ctx.fillStyle = 'rgba(210, 180, 140, 0.3)';
+  var ex1 = t.tx(-entryW / 2), ey1 = t.ty(entryH);
+  var ex2 = t.tx(entryW / 2), ey2 = t.ty(0);
+  ctx.fillRect(ex1, ey1, ex2 - ex1, ey2 - ey1);
+  ctx.restore();
+  // Entry outline
+  drawLine(ctx, t, -entryW / 2, 0, -entryW / 2, entryH, '#8B6914', 2);
+  drawLine(ctx, t, entryW / 2, 0, entryW / 2, entryH, '#8B6914', 2);
+  drawLine(ctx, t, -entryW / 2, entryH, entryW / 2, entryH, '#8B6914', 2);
+  drawText(ctx, t, 0, entryH / 2, 'ENTRY', { size: 11, color: '#8B6914', weight: '600' });
+
+  // Right wing roof line: from connection point down to outer post
+  drawLine(ctx, t, connX, connY, wingLateralExtent, wingOuterY, '#c0392b', 2.5);
+  // Right wing outer wall (post)
+  drawLine(ctx, t, wingLateralExtent, 0, wingLateralExtent, wingOuterY, '#c0392b', 2);
+
+  // Left wing (mirror)
+  drawLine(ctx, t, -connX, connY, -wingLateralExtent, wingOuterY, '#c0392b', 2.5);
+  drawLine(ctx, t, -wingLateralExtent, 0, -wingLateralExtent, wingOuterY, '#c0392b', 2);
+
+  // Wing fill (light red tint)
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = '#c0392b';
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(t.tx(connX), t.ty(connY));
+  ctx.lineTo(t.tx(wingLateralExtent), t.ty(wingOuterY));
+  ctx.lineTo(t.tx(wingLateralExtent), t.ty(0));
+  ctx.lineTo(t.tx(connX), t.ty(0));
+  ctx.closePath();
+  ctx.fill();
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(t.tx(-connX), t.ty(connY));
+  ctx.lineTo(t.tx(-wingLateralExtent), t.ty(wingOuterY));
+  ctx.lineTo(t.tx(-wingLateralExtent), t.ty(0));
+  ctx.lineTo(t.tx(-connX), t.ty(0));
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
+  ctx.restore();
+
+  // Connection points (red dots)
+  drawDot(ctx, t, connX, connY, 6, '#c0392b');
+  drawDot(ctx, t, -connX, connY, 6, '#c0392b');
+
+  // --- Dimension lines ---
+
+  // Dome peak height
+  var dimX = xMax - 3;
+  drawDimArrow(ctx, t, dimX, 0, dimX, domeR, domeR.toFixed(1) + "'", '#2c3e50', 'right');
+  drawText(ctx, t, dimX + 2.5, domeR / 2, 'DOME PEAK', { size: 9, color: '#2c3e50', weight: '600', align: 'left' });
+
+  // Connection height
+  var dimX2 = connX + 2;
+  drawDimArrow(ctx, t, dimX2, 0, dimX2, connY, connY.toFixed(1) + "'", '#c0392b', 'right');
+  drawText(ctx, t, dimX2 + 2.5, connY + 1.5, 'CONN', { size: 9, color: '#c0392b', weight: '600', align: 'left' });
+
+  // Post height on right
+  var dimX3 = wingLateralExtent + 2;
+  drawDimArrow(ctx, t, dimX3, 0, dimX3, wingOuterY, wingOuterY.toFixed(0) + "'", '#c0392b', 'right');
+  drawText(ctx, t, dimX3 + 2.5, wingOuterY / 2, 'POST', { size: 9, color: '#c0392b', weight: '600', align: 'left' });
+
+  // Entry height on left
+  var dimX4 = -entryW / 2 - 2;
+  drawDimArrow(ctx, t, dimX4, 0, dimX4, entryH, entryH.toFixed(0) + "'", '#8B6914', 'left');
+
+  // Base diameter
+  drawDimArrow(ctx, t, -domeR, -1.8, domeR, -1.8, (domeR * 2).toFixed(0) + "' dia", '#2c3e50');
+
+  // Wing lateral label
+  drawText(ctx, t, (connX + wingLateralExtent) / 2, wingOuterY - 1.5, 'WING ROOF', { size: 10, color: '#c0392b', weight: '600' });
+
+  // Pitch angle label on right roof line
+  var roofMidX = (connX + wingLateralExtent) / 2;
+  var roofMidY = connY + (wingOuterY - connY) * ((roofMidX - connX) / (wingLateralExtent - connX));
+  var roofAngle = Math.atan2(connY - wingOuterY, wingLateralExtent - connX) * RAD2DEG;
+  drawText(ctx, t, roofMidX, roofMidY + 1.5, pitchDeg.toFixed(1) + '\u00B0 pitch', {
+    size: 10, color: '#c0392b', weight: '700',
+    rotation: -roofAngle
+  });
+}
+
+// ===================================================================
+// Junction Detail
+// ===================================================================
+function drawJunctionDetail(pitchDeg) {
+  var canvas = document.getElementById('junction-detail');
+  var s = setupCanvas(canvas);
+  var ctx = s.ctx, w = s.w, h = s.h;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Title
+  ctx.save();
+  ctx.font = 'bold 14px -apple-system, sans-serif';
+  ctx.fillStyle = '#2c3e50';
+  ctx.textAlign = 'center';
+  ctx.fillText('Junction Detail \u2014 Wing Roof Meets Dome', w / 2, 20);
+  ctx.restore();
+
+  var geo = computeGeometry(pitchDeg);
+
+  // Dome geometry (same as front elevation)
+  var domeCX = 0;
+  var domeCY = 0;
+  var domeR = DOME_R;
+
+  // Connection point
+  var connAngleDeg = CONN_ANGLE_DEG;
+  var connAngle = connAngleDeg * DEG2RAD;
+  var connX = domeR * Math.cos(connAngle);
+  var connY = domeR * Math.sin(connAngle);
+
+  // Zoomed view: center on connection point, show about 10' around it
+  var viewR = 8;
+  var xMin = connX - viewR;
+  var xMax = connX + viewR;
+  var yMin = connY - viewR;
+  var yMax = connY + viewR;
+
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+
+  // Background grid (subtle)
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+  ctx.lineWidth = 0.5;
+  for (var gx = Math.floor(xMin); gx <= Math.ceil(xMax); gx++) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(gx), t.ty(yMin));
+    ctx.lineTo(t.tx(gx), t.ty(yMax));
+    ctx.stroke();
+  }
+  for (var gy = Math.floor(yMin); gy <= Math.ceil(yMax); gy++) {
+    ctx.beginPath();
+    ctx.moveTo(t.tx(xMin), t.ty(gy));
+    ctx.lineTo(t.tx(xMax), t.ty(gy));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Dome arc (section from -10 to +50 around connection point)
+  var arcStart = connAngleDeg - 25;
+  var arcEnd = connAngleDeg + 35;
+  // Dome shell fill (section)
+  drawFilledArc(ctx, t, domeCX, domeCY, domeR, arcStart, arcEnd, 'rgba(173, 216, 230, 0.12)');
+  // Inner side of dome (slightly smaller radius to show shell thickness)
+  var shellThick = 0.3;
+  drawArc(ctx, t, domeCX, domeCY, domeR, arcStart, arcEnd, '#2c3e50', 3);
+  drawArc(ctx, t, domeCX, domeCY, domeR - shellThick, arcStart, arcEnd, '#2c3e50', 1);
+
+  // Radius line from dome center toward connection point (dashed)
+  // Only draw the visible portion
+  var radEndX = connX;
+  var radEndY = connY;
+  var radStartX = domeCX + (domeR - viewR * 1.2) * Math.cos(connAngle);
+  var radStartY = domeCY + (domeR - viewR * 1.2) * Math.sin(connAngle);
+  // Clamp to view
+  if (radStartX < xMin) {
+    var frac = (xMin - domeCX) / (connX - domeCX);
+    radStartX = xMin;
+    radStartY = domeCY + frac * (connY - domeCY);
+  }
+
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  drawLine(ctx, t, radStartX, radStartY, radEndX, radEndY, '#999', 1.5);
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Connection point (big dot)
+  drawDot(ctx, t, connX, connY, 7, '#c0392b');
+
+  // --- Dome tangent at connection point ---
+  // Tangent is perpendicular to the radius. Radius direction is (cos(connAngle), sin(connAngle))
+  // Tangent direction is (-sin(connAngle), cos(connAngle))
+  var tangDx = -Math.sin(connAngle);
+  var tangDy = Math.cos(connAngle);
+  var tangLen = 6; // feet to draw in each direction
+
+  // Draw tangent line (both directions from connection point)
+  var tang1X = connX - tangLen * tangDx;
+  var tang1Y = connY - tangLen * tangDy;
+  var tang2X = connX + tangLen * tangDx;
+  var tang2Y = connY + tangLen * tangDy;
+
+  ctx.save();
+  ctx.setLineDash([6, 3]);
+  drawLine(ctx, t, tang1X, tang1Y, tang2X, tang2Y, '#27ae60', 2);
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Label tangent
+  drawText(ctx, t, tang2X + 0.3, tang2Y + 0.8, 'DOME TANGENT', {
+    size: 10, color: '#27ae60', weight: '600', align: 'left'
+  });
+
+  // --- Wing roof line ---
+  // The wing roof departs from the connection point going right and downward
+  // at the pitch angle below horizontal
+  var pitchRad = pitchDeg * DEG2RAD;
+  // Wing goes outward (to the right) and downward. Direction: (cos(-pitch), sin(-pitch))
+  var wingDx = Math.cos(-pitchRad);
+  var wingDy = Math.sin(-pitchRad);
+  var wingLen = 7; // feet to draw
+
+  var wingEndX = connX + wingLen * wingDx;
+  var wingEndY = connY + wingLen * wingDy;
+
+  drawLine(ctx, t, connX, connY, wingEndX, wingEndY, '#c0392b', 2.5);
+
+  // Wing direction arrow
+  var arrowX = connX + (wingLen - 1) * wingDx;
+  var arrowY = connY + (wingLen - 1) * wingDy;
+  drawDot(ctx, t, wingEndX, wingEndY, 4, '#c0392b');
+
+  // Label wing roof
+  var wingMidX = connX + wingLen * 0.5 * wingDx;
+  var wingMidY = connY + wingLen * 0.5 * wingDy;
+  drawText(ctx, t, wingMidX - 0.5, wingMidY - 1, 'WING ROOF', {
+    size: 10, color: '#c0392b', weight: '600'
+  });
+
+  // --- Angles ---
+  // 1. Dome tangent angle from horizontal: tangent direction is (-sin(conn), cos(conn))
+  //    The tangent going upward-left makes angle = (90 + connAngleDeg) from positive x-axis
+  //    The tangent going downward-right makes angle = -(90 - connAngleDeg) from positive x-axis
+  //    Tangent going up to the right (from connection): angle = 90 + connAngleDeg measured from +x
+  //    Actually: tangent direction (tangDx, tangDy) = (-sin(20), cos(20))
+  //    Angle of this from +x axis = atan2(cos(20), -sin(20)) = 90+20 = 110 degrees
+
+  // The downward tangent direction (toward lower dome surface):
+  var tangDownAngle = (90 + connAngleDeg + 180); // degrees from +x axis (going down-right on dome)
+  // Simplify: tangent going down-right = (sin(connAngle), -cos(connAngle))
+  var tangDownDx = Math.sin(connAngle);
+  var tangDownDy = -Math.cos(connAngle);
+  var tangDownAngleDeg = Math.atan2(tangDownDy, tangDownDx) * RAD2DEG; // negative angle
+
+  // Wing roof angle from +x axis
+  var wingAngleDeg = Math.atan2(wingDy, wingDx) * RAD2DEG; // negative
+
+  // Junction angle = angle between dome tangent (going down-right) and wing roof line
+  // Both go "away" from connection point; the angle between them is what the builder cares about
+  var junctionAngle = Math.abs(wingAngleDeg - tangDownAngleDeg);
+  if (junctionAngle > 180) junctionAngle = 360 - junctionAngle;
+
+  // Draw angle arc: between the tangent (going down) and the wing roof line
+  // Arc centered at connection point
+  var arcR = 3; // feet
+  var arcAngle1 = tangDownAngleDeg;
+  var arcAngle2 = wingAngleDeg;
+  // Ensure we go the short way
+  if (arcAngle1 > arcAngle2) {
+    var tmp = arcAngle1;
+    arcAngle1 = arcAngle2;
+    arcAngle2 = tmp;
+  }
+  if (arcAngle2 - arcAngle1 > 180) {
+    arcAngle1 += 360;
+    var tmp2 = arcAngle1;
+    arcAngle1 = arcAngle2;
+    arcAngle2 = tmp2;
+  }
+
+  // Draw filled angle wedge
+  drawFilledArc(ctx, t, connX, connY, arcR, arcAngle1, arcAngle2, 'rgba(231, 76, 60, 0.15)');
+  drawArc(ctx, t, connX, connY, arcR, arcAngle1, arcAngle2, '#e74c3c', 2);
+
+  // Junction angle label
+  var midArcAngle = (arcAngle1 + arcAngle2) / 2 * DEG2RAD;
+  var labelR = arcR + 1.2;
+  var labelX = connX + labelR * Math.cos(midArcAngle);
+  var labelY = connY + labelR * Math.sin(midArcAngle);
+  drawText(ctx, t, labelX, labelY, junctionAngle.toFixed(1) + '\u00B0', {
+    size: 13, color: '#e74c3c', weight: '700'
+  });
+  drawText(ctx, t, labelX, labelY - 1, 'JUNCTION', {
+    size: 9, color: '#e74c3c', weight: '600'
+  });
+
+  // --- Pitch angle arc (from horizontal to wing roof) ---
+  var pitchArcR = 4.5;
+  var pitchArc1 = Math.min(0, wingAngleDeg);
+  var pitchArc2 = Math.max(0, wingAngleDeg);
+  if (wingAngleDeg < 0) {
+    pitchArc1 = wingAngleDeg;
+    pitchArc2 = 0;
+  }
+  drawArc(ctx, t, connX, connY, pitchArcR, pitchArc1, pitchArc2, '#2980b9', 1.5);
+
+  // Pitch label
+  var pitchMidAngle = (pitchArc1 + pitchArc2) / 2 * DEG2RAD;
+  var pitchLabelR = pitchArcR + 1;
+  var pitchLabelX = connX + pitchLabelR * Math.cos(pitchMidAngle);
+  var pitchLabelY = connY + pitchLabelR * Math.sin(pitchMidAngle);
+  drawText(ctx, t, pitchLabelX, pitchLabelY, pitchDeg.toFixed(1) + '\u00B0 pitch', {
+    size: 11, color: '#2980b9', weight: '700'
+  });
+
+  // Horizontal reference line
+  ctx.save();
+  ctx.setLineDash([3, 3]);
+  drawLine(ctx, t, connX, connY, connX + 6, connY, '#2980b9', 1);
+  ctx.setLineDash([]);
+  ctx.restore();
+  drawText(ctx, t, connX + 6.3, connY + 0.4, 'HORIZ', {
+    size: 9, color: '#2980b9', weight: '600', align: 'left'
+  });
+
+  // --- Dome tangent angle from horizontal ---
+  // The tangent going up-left from connection: angle = 90 + connAngleDeg from +x
+  // The dome tangent at this point makes angle (90 - connAngleDeg) with horizontal
+  // Actually at connAngle=20 above horizontal, the tangent to the circle is perpendicular to radius
+  // Radius at 20 deg is at angle 20 from horizontal, so tangent is at 20+90=110 from +x axis
+  // Tangent angle from horizontal = 90 - connAngleDeg... no.
+  // Let's think: tangent direction going upward = (-sin(20), cos(20)) = angle 110 from +x
+  // So from horizontal it's 110 degrees. The angle between horizontal and tangent = 110 - 180 = ...
+  // Going the other way: tangent going down-right = (sin(20), -cos(20))
+  // angle from +x = atan2(-cos(20), sin(20)) = about -70 degrees
+  // So dome tangent going down makes 70 degrees below horizontal
+  var tangFromHoriz = 90 - connAngleDeg; // degrees below horizontal for down-going tangent
+
+  // Draw small dome tangent angle arc
+  var dtArcR = 2;
+  // Arc from tangent-down angle to horizontal (0)
+  var dtArc1 = tangDownAngleDeg; // negative
+  var dtArc2 = 0;
+  if (dtArc1 > dtArc2) { var tt = dtArc1; dtArc1 = dtArc2; dtArc2 = tt; }
+
+  ctx.save();
+  ctx.setLineDash([2, 2]);
+  drawArc(ctx, t, connX, connY, dtArcR, dtArc1, dtArc2, '#27ae60', 1.5);
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  var dtMidAngle = (dtArc1 + dtArc2) / 2 * DEG2RAD;
+  var dtLabelR = dtArcR + 0.8;
+  var dtLabelX = connX + dtLabelR * Math.cos(dtMidAngle);
+  var dtLabelY = connY + dtLabelR * Math.sin(dtMidAngle);
+  drawText(ctx, t, dtLabelX - 0.2, dtLabelY, tangFromHoriz.toFixed(0) + '\u00B0', {
+    size: 9, color: '#27ae60', weight: '600'
+  });
+
+  // Connection point label
+  drawText(ctx, t, connX - 1.5, connY + 1, 'CONNECTION', {
+    size: 10, color: '#c0392b', weight: '700'
+  });
+  drawText(ctx, t, connX - 1.5, connY + 0.2, '(' + connX.toFixed(1) + "', " + connY.toFixed(1) + "')", {
+    size: 9, color: '#666', weight: '600'
+  });
+
+  // Legend box in bottom-left
+  ctx.save();
+  var lx = 12, ly = h - 70;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1;
+  ctx.fillRect(lx, ly, 200, 60);
+  ctx.strokeRect(lx, ly, 200, 60);
+  ctx.font = 'bold 10px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  // Legend items
+  var items = [
+    ['#2c3e50', 'Dome shell'],
+    ['#27ae60', 'Dome tangent (' + tangFromHoriz.toFixed(0) + '\u00B0 from horiz)'],
+    ['#c0392b', 'Wing roof (' + pitchDeg.toFixed(1) + '\u00B0 pitch)'],
+    ['#e74c3c', 'Junction angle: ' + junctionAngle.toFixed(1) + '\u00B0'],
+  ];
+  for (var i = 0; i < items.length; i++) {
+    ctx.fillStyle = items[i][0];
+    ctx.fillRect(lx + 8, ly + 10 + i * 13, 10, 3);
+    ctx.fillText(items[i][1], lx + 24, ly + 11 + i * 13);
+  }
+  ctx.restore();
+
+  return { connHeight: connY, junctionAngle: junctionAngle };
+}
+
+// ===================================================================
+// Update loop
+// ===================================================================
+function update() {
+  var slider = document.getElementById('pitch-slider');
+  var pitchDeg = parseFloat(slider.value);
+  var geo = computeGeometry(pitchDeg);
+
+  document.getElementById('pitch-value').innerHTML = pitchDeg.toFixed(1) + '&deg;';
+  document.getElementById('sum-pitch').innerHTML = pitchDeg.toFixed(1) + '&deg;';
+
+  drawFrontElevation(pitchDeg);
+  var jd = drawJunctionDetail(pitchDeg);
+
+  document.getElementById('sum-conn-ht').textContent = jd.connHeight.toFixed(1) + "'";
+  document.getElementById('sum-span').textContent = geo.horizSpan.toFixed(1) + "'";
+  document.getElementById('sum-rafter').textContent = geo.rafterLen.toFixed(1) + "'";
+  document.getElementById('sum-junction').textContent = jd.junctionAngle.toFixed(1) + '\u00B0';
+}
+
+// ===================================================================
+// Init
+// ===================================================================
+var slider = document.getElementById('pitch-slider');
+
+// Load pitch from URL hash
+var hash = window.location.hash.slice(1);
+if (hash) {
+  var params = new URLSearchParams(hash);
+  var p = parseFloat(params.get('pitch'));
+  if (p >= 20 && p <= 35) slider.value = p;
+}
+
+slider.addEventListener('input', function() {
+  update();
+  // Update URL hash
+  window.location.hash = 'pitch=' + parseFloat(slider.value).toFixed(1);
+});
+
+// Responsive resize
+window.addEventListener('resize', update);
+
+// Listen for pitch changes from parent (iframe sync)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'setPitch') {
+    var v = parseFloat(e.data.value);
+    if (v >= 20 && v <= 35) { slider.value = v; update(); }
+  }
+});
+
+update();
+</script>
+</body>
+</html>

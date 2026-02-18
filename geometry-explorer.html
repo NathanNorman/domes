@@ -754,6 +754,15 @@ if (hashMatch) {
 
 slider.addEventListener('input', update);
 window.addEventListener('resize', update);
+
+// Listen for pitch changes from parent (iframe sync)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'setPitch') {
+    var v = parseFloat(e.data.value);
+    if (v >= 20 && v <= 35) { slider.value = v; update(); }
+  }
+});
+
 update();
 </script>
 </body>

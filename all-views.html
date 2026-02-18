@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hippie Hideout — All Views</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f0;
+    color: #333;
+  }
+  .sticky-controls {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: #2c3e50;
+    padding: 12px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .sticky-controls h1 {
+    color: white;
+    font-size: 1.1em;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .slider-row label {
+    font-weight: 600;
+    font-size: 0.95em;
+    white-space: nowrap;
+    color: white;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: #e74c3c;
+    height: 8px;
+  }
+  .slider-row .value {
+    font-weight: 700;
+    font-size: 1.2em;
+    min-width: 50px;
+    text-align: right;
+    color: #e74c3c;
+  }
+
+  .views {
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .view-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  .view-card .view-title {
+    background: #ecf0f1;
+    padding: 6px 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #2c3e50;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .view-card .view-title a {
+    font-size: 0.85em;
+    color: #2980b9;
+    text-decoration: none;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .view-card .view-title a:hover { text-decoration: underline; }
+  .view-card iframe {
+    width: 100%;
+    height: 500px;
+    border: none;
+    display: block;
+  }
+  .view-card.tall iframe {
+    height: 600px;
+  }
+
+  @media (max-width: 900px) {
+    .views { grid-template-columns: 1fr; }
+    .view-card iframe { height: 400px; }
+    .view-card.tall iframe { height: 480px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sticky-controls">
+  <h1>Hippie Hideout — All Views Synced</h1>
+  <div class="slider-row">
+    <label for="master-pitch">Roof Pitch:</label>
+    <input type="range" id="master-pitch" min="20" max="35" step="0.5" value="20">
+    <span class="value" id="master-value">20.0&deg;</span>
+  </div>
+</div>
+
+<div class="views">
+  <div class="view-card">
+    <div class="view-title">
+      <span>Cross-Section + Floor Plan</span>
+      <a href="geometry-explorer.html" target="_blank">Open standalone</a>
+    </div>
+    <iframe src="geometry-explorer.html" id="frame-explorer"></iframe>
+  </div>
+
+  <div class="view-card">
+    <div class="view-title">
+      <span>Height Profile + Wing Area</span>
+      <a href="view-height-profile.html" target="_blank">Open standalone</a>
+    </div>
+    <iframe src="view-height-profile.html" id="frame-height"></iframe>
+  </div>
+
+  <div class="view-card">
+    <div class="view-title">
+      <span>Front Elevation + Junction Detail</span>
+      <a href="view-elevations.html" target="_blank">Open standalone</a>
+    </div>
+    <iframe src="view-elevations.html" id="frame-elevations"></iframe>
+  </div>
+
+  <div class="view-card">
+    <div class="view-title">
+      <span>Unfolded Roof Panel</span>
+      <a href="view-roof-panel.html" target="_blank">Open standalone</a>
+    </div>
+    <iframe src="view-roof-panel.html" id="frame-panel"></iframe>
+  </div>
+
+  <div class="view-card">
+    <div class="view-title">
+      <span>Pitch Comparison (A vs B)</span>
+      <a href="view-comparison.html" target="_blank">Open standalone</a>
+    </div>
+    <iframe src="view-comparison.html" id="frame-comparison"></iframe>
+  </div>
+</div>
+
+<script>
+var slider = document.getElementById('master-pitch');
+var label = document.getElementById('master-value');
+
+var frames = [
+  document.getElementById('frame-explorer'),
+  document.getElementById('frame-height'),
+  document.getElementById('frame-elevations'),
+  document.getElementById('frame-panel'),
+  document.getElementById('frame-comparison')
+];
+
+function broadcast() {
+  var pitch = parseFloat(slider.value);
+  label.innerHTML = pitch.toFixed(1) + '&deg;';
+  var msg = { type: 'setPitch', value: pitch };
+  for (var i = 0; i < frames.length; i++) {
+    if (frames[i].contentWindow) {
+      frames[i].contentWindow.postMessage(msg, '*');
+    }
+  }
+  history.replaceState(null, '', '#pitch=' + pitch.toFixed(1));
+}
+
+slider.addEventListener('input', broadcast);
+
+// Restore from URL hash
+var hashMatch = window.location.hash.match(/pitch=([\d.]+)/);
+if (hashMatch) {
+  var v = parseFloat(hashMatch[1]);
+  if (v >= 20 && v <= 35) slider.value = v;
+}
+
+// Broadcast initial value once iframes load
+window.addEventListener('load', function() {
+  setTimeout(broadcast, 500);
+});
+</script>
+</body>
+</html>
