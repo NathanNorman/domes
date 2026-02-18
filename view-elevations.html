@@ -424,13 +424,18 @@ function drawElevation(pitchDeg, viewAngleDeg) {
   var leftAvgD  = leftWing.reduce(function(s, v) { return s + depthOf(v.wx, v.wy); }, 0) / leftWing.length;
   var entryAvgD = entryCorners.reduce(function(s, c) { return s + depthOf(c.wx, c.wy); }, 0) / entryCorners.length;
 
-  // --- World bounds (projected X range) ---
-  var allPX = [];
-  rightWing.forEach(function(v) { allPX.push(projX(v.wx, v.wy)); });
-  leftWing.forEach(function(v) { allPX.push(projX(v.wx, v.wy)); });
-  allPX.push(entryMinPX, entryMaxPX, -domeR, domeR);
-  var xMin = Math.min.apply(null, allPX) - 5;
-  var xMax = Math.max.apply(null, allPX) + 5;
+  // --- World bounds (stable across all rotation angles) ---
+  // Use max distance-from-origin of any vertex as fixed X extent.
+  // Prevents scale jitter when wings go edge-on during rotation.
+  var maxR = domeR;
+  rightWing.concat(leftWing).forEach(function(v) {
+    maxR = Math.max(maxR, Math.sqrt(v.wx * v.wx + v.wy * v.wy));
+  });
+  entryCorners.forEach(function(c) {
+    maxR = Math.max(maxR, Math.sqrt(c.wx * c.wx + c.wy * c.wy));
+  });
+  var xMin = -maxR - 5;
+  var xMax = maxR + 5;
   var yMin = -3;
   var yMax = domePeak + 3;
 
