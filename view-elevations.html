@@ -717,8 +717,21 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
   if (opaque) {
     // Face-by-face rendering for proper occlusion
     var allFaces = [];
-    // Dome as single element at depth 0 (opaque fill covers back elements)
-    allFaces.push({ depth: 0, draw: function() { drawDomeShape(); } });
+    // Dome shell (semicircle) at center depth — sits above riser, no vertical overlap with wings
+    allFaces.push({ depth: 0, draw: function() {
+      drawFilledArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#D4E8EF');
+      drawArc(ctx, t, 0, RISER_H, domeR, 0, 180, '#6A9BB5', 2);
+    } });
+    // Riser wall at front of dome cylinder — depth = -domeR so it draws in front of wing roofs
+    allFaces.push({ depth: -domeR, draw: function() {
+      ctx.save();
+      ctx.fillStyle = '#B8B0A0';
+      ctx.fillRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
+      ctx.strokeStyle = '#8A8278';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(t.tx(-domeR), t.ty(RISER_H), t.tx(domeR) - t.tx(-domeR), t.ty(0) - t.ty(RISER_H));
+      ctx.restore();
+    } });
     collectWingFaces(rightWingPts, rOH_C, rOH_D, allFaces);
     collectWingFaces(leftWingPts, lOH_C, lOH_D, allFaces);
     collectEntryFaces(allFaces);
