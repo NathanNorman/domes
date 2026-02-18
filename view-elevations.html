@@ -403,11 +403,9 @@ function drawElevation(pitchDeg, viewAngleDeg) {
   var connWx = domeConnR * Math.cos(connAngle2d);
   var connWy = domeConnR * Math.sin(connAngle2d);
 
-  // Right wing roof vertices (dome connection → W → W2 → Post)
+  // Right wing: simplified to connection + post (clean wedge silhouette)
   var rightWing = [
     { wx: connWx, wy: connWy, h: LEFT_WALL_H },
-    { wx: Wx, wy: Wy, h: LEFT_WALL_H },
-    { wx: W2x, wy: W2y, h: 12 },
     { wx: PostX, wy: PostY, h: RIGHT_POST_H }
   ];
   // Left wing (mirror across Y axis)
@@ -470,46 +468,37 @@ function drawElevation(pitchDeg, viewAngleDeg) {
   }
 
   function drawWingShape(wing, color) {
-    // Project and sort by screen X for clean silhouette
-    var projected = wing.map(function(v) {
-      return { px: projX(v.wx, v.wy), h: v.h };
-    });
-    var sorted = projected.slice().sort(function(a, b) { return a.px - b.px; });
-    var leftPX = sorted[0].px, rightPX = sorted[sorted.length - 1].px;
+    // Project connection (wing[0]) and post (wing[1])
+    var connPX = projX(wing[0].wx, wing[0].wy);
+    var postPX = projX(wing[1].wx, wing[1].wy);
+    var connH = wing[0].h, postH = wing[1].h;
+    var leftPX = Math.min(connPX, postPX);
+    var rightPX = Math.max(connPX, postPX);
 
     // Skip if edge-on (too narrow to draw)
     if (Math.abs(t.tx(rightPX) - t.tx(leftPX)) < 4) return;
 
-    // Filled silhouette: ground left→right, roof right→left
+    // Filled trapezoid: conn ground → post ground → post roof → conn roof
     ctx.save();
-    ctx.globalAlpha = 0.12;
+    ctx.globalAlpha = 0.1;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(t.tx(sorted[0].px), t.ty(0));
-    for (var i = 1; i < sorted.length; i++)
-      ctx.lineTo(t.tx(sorted[i].px), t.ty(0));
-    for (var i = sorted.length - 1; i >= 0; i--)
-      ctx.lineTo(t.tx(sorted[i].px), t.ty(sorted[i].h));
+    ctx.moveTo(t.tx(connPX), t.ty(0));
+    ctx.lineTo(t.tx(postPX), t.ty(0));
+    ctx.lineTo(t.tx(postPX), t.ty(postH));
+    ctx.lineTo(t.tx(connPX), t.ty(connH));
     ctx.closePath();
     ctx.fill();
     ctx.globalAlpha = 1.0;
     ctx.restore();
 
-    // Roof line (sorted by X)
-    ctx.beginPath();
-    ctx.moveTo(t.tx(sorted[0].px), t.ty(sorted[0].h));
-    for (var i = 1; i < sorted.length; i++)
-      ctx.lineTo(t.tx(sorted[i].px), t.ty(sorted[i].h));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    // Vertical edges at extremes
-    drawLine(ctx, t, leftPX, 0, leftPX, sorted[0].h, color, 2);
-    drawLine(ctx, t, rightPX, 0, rightPX, sorted[sorted.length - 1].h, color, 2);
-
-    // Connection dot at first vertex (dome connection)
-    drawDot(ctx, t, projected[0].px, projected[0].h, 5, color);
+    // Roof line
+    drawLine(ctx, t, connPX, connH, postPX, postH, color, 2.5);
+    // Vertical edges
+    drawLine(ctx, t, connPX, 0, connPX, connH, color, 2);
+    drawLine(ctx, t, postPX, 0, postPX, postH, color, 2);
+    // Connection dot
+    drawDot(ctx, t, connPX, connH, 5, color);
   }
 
   function drawEntryShape() {
@@ -560,7 +549,7 @@ function drawElevation(pitchDeg, viewAngleDeg) {
   // Wing connection height (use nearest wing's connection)
   var nearWing = (rightAvgD < leftAvgD) ? rightWing : leftWing;
   var nearConnPX = projX(nearWing[0].wx, nearWing[0].wy);
-  var nearPostPX = projX(nearWing[3].wx, nearWing[3].wy);
+  var nearPostPX = projX(nearWing[1].wx, nearWing[1].wy);
   drawDimArrow(ctx, t, nearConnPX + 2, 0, nearConnPX + 2, LEFT_WALL_H,
     LEFT_WALL_H.toFixed(0) + "'", '#c0392b', 'right');
   drawDimArrow(ctx, t, nearPostPX + 2, 0, nearPostPX + 2, RIGHT_POST_H,
