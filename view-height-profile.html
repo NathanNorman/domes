@@ -329,8 +329,8 @@ function draw(pitchDeg) {
   var plotH = H - marginT - marginB;
 
   // Axis ranges
-  var xMax = Math.ceil(geo.horizSpan / 5) * 5 + 5; // round up to next 5, plus padding
-  if (xMax < geo.horizSpan + 2) xMax += 5;
+  // Fixed x-axis: use max possible span (at 20° pitch) so axis doesn't shift with slider
+  var xMax = 40;
   var yMax = 22;
   var yMin = 0;
 
