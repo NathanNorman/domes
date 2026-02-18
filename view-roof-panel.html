@@ -531,9 +531,7 @@ function drawPanel(g) {
   ctx.textBaseline = 'middle';
   ctx.fillText('Wing Room', t.tx(wrcX), t.ty(wrcY));
 
-  var excX = (panel.sW2[0] + panel.sPost[0] + panel.sW3[0]) / 3;
-  var excY = (panel.sW2[1] + panel.sPost[1] + panel.sW3[1]) / 3;
-  ctx.fillText('Extension', t.tx(excX), t.ty(excY));
+  // "Extension" area label removed — edge label already says "Extension"
 
   // Centroid from 6 main vertices (not arc points) for label offsets
   var mv = panel.mainVerts;
@@ -657,8 +655,9 @@ function drawPanel(g) {
       var innerColor = '#c0392b';
       var nx = -dy / edgeLen;
       var ny = dx / edgeLen;
+      // Point toward centroid (Wing Room side) to avoid crowding Extension labels
       var toCenter = (cx - mx) * nx + (cy - my) * ny;
-      if (toCenter > 0) { nx = -nx; ny = -ny; }
+      if (toCenter < 0) { nx = -nx; ny = -ny; }
       var labelOff = 2.5;
       var hashLen = 0.6;
       ctx.strokeStyle = innerColor;
@@ -756,12 +755,15 @@ function drawPanel(g) {
     var pt = mv[c];
     // Dot
     ctx.beginPath();
-    ctx.arc(t.tx(pt[0]), t.ty(pt[1]), 5, 0, 2 * Math.PI);
+    ctx.arc(t.tx(pt[0]), t.ty(pt[1]), cornerNames[c] === 'PostDome' ? 3 : 5, 0, 2 * Math.PI);
     ctx.fillStyle = cornerColors[c];
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    // Skip text labels for PostDome (technical vertex, too close to W3)
+    if (cornerNames[c] === 'PostDome') continue;
 
     // Bisector direction for label placement
     var prev = mv[(c + 5) % 6];
