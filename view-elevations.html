@@ -580,11 +580,10 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
     var cy = (A.wy + B.wy + C.wy + D.wy) / 4;
     var tvx = sinA, tvy = -cosA; // toward-viewer direction
 
+    // Only 2 solid walls — the front (dome side) is open porch
     var wallDefs = [
-      { p1: A, p2: B, h1: LEFT_WALL_H, h2: LEFT_WALL_H, color: '#B8A888' },  // back wall (tall)
-      { p1: B, p2: C, h1: LEFT_WALL_H, h2: RIGHT_POST_H, color: '#A89878' }, // far side
-      { p1: C, p2: D, h1: RIGHT_POST_H, h2: RIGHT_POST_H, color: '#C8B898' }, // front wall (short)
-      { p1: D, p2: A, h1: RIGHT_POST_H, h2: LEFT_WALL_H, color: '#A89878' }  // near side
+      { p1: A, p2: B, h1: LEFT_WALL_H, h2: LEFT_WALL_H, color: '#B8A888' },  // back wall (tall, 20')
+      { p1: B, p2: C, h1: LEFT_WALL_H, h2: RIGHT_POST_H, color: '#A89878' }  // far side (slopes 20'→8')
     ];
 
     wallDefs.forEach(function(wd) {
