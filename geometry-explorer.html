@@ -116,9 +116,16 @@
   .actions button:hover { background: #34495e; }
 
   @media (max-width: 768px) {
-    .canvas-row { flex-direction: column; align-items: center; }
-    .canvas-wrap { max-width: 100%; }
+    .canvas-row { flex-direction: column; align-items: center; padding: 8px; gap: 8px; }
+    .canvas-wrap { max-width: 100%; flex: 0 0 auto; }
     header h1 { font-size: 1.1em; }
+    header { padding: 10px 16px; }
+    .controls { padding: 0 8px 4px; }
+    .summary { padding: 0 8px; }
+    .summary-grid { padding: 8px 12px; gap: 8px; }
+    .summary-item .val { font-size: 1.1em; }
+    .actions { padding: 8px; }
+    .actions button { padding: 6px 12px; font-size: 0.8em; }
   }
   @media print {
     header { background: white; color: black; }
