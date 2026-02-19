@@ -225,19 +225,12 @@
   <button onclick="shareLink()">Copy Share Link</button>
 </div>
 
+<script src="dome-shared.js"></script>
 <script>
 // ===================================================================
-// Constants
+// Constants (local to this view)
 // ===================================================================
-const LEFT_WALL_H = 20.0;
-const RIGHT_POST_H = 8.0;
-const ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
-const INTERIOR_WALL_H = 12.0;
-const BACK_WALL_LEN = 30.0;
-const DOME_R = 16.5;
-const MIN_CLEARANCE = 6 + 8/12; // 6'8" = 6.667 feet
-
-const DEG2RAD = Math.PI / 180;
+var MIN_CLEARANCE = 6 + 8/12; // 6'8" = 6.667 feet
 
 // ===================================================================
 // Geometry Engine

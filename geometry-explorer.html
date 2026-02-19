@@ -171,20 +171,8 @@
   <button onclick="shareLink()">Copy Share Link</button>
 </div>
 
+<script src="dome-shared.js"></script>
 <script>
-// ═══════════════════════════════════════════════════════════════
-// Constants (from Python)
-// ═══════════════════════════════════════════════════════════════
-const LEFT_WALL_H = 20.0;
-const RIGHT_POST_H = 8.0;
-const ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
-const INTERIOR_WALL_H = 12.0;
-const BACK_WALL_LEN = 30.0;
-const DOME_R = 16.5;
-const CONN_ANGLE_DEG = 20.0;
-const WALL_ANGLE_DEG = -25.0;
-
-const DEG2RAD = Math.PI / 180;
 
 // ═══════════════════════════════════════════════════════════════
 // Geometry Engine
@@ -199,79 +187,12 @@ function computeGeometry(pitchDeg) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Drawing Utilities
+// Drawing Utilities (unique to this view)
 // ═══════════════════════════════════════════════════════════════
-function setupCanvas(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  return { ctx, w: rect.width, h: rect.height };
-}
-
-// World-to-screen transform helpers
-function makeTransform(w, h, xMin, xMax, yMin, yMax) {
-  const padX = 0.05 * w, padY = 0.05 * h;
-  const drawW = w - 2 * padX;
-  const drawH = h - 2 * padY;
-  const scaleX = drawW / (xMax - xMin);
-  const scaleY = drawH / (yMax - yMin);
-  const scale = Math.min(scaleX, scaleY);
-  const offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
-  const offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
-  return {
-    tx: (x) => offsetX + (x - xMin) * scale,
-    ty: (y) => h - (offsetY + (y - yMin) * scale),
-    scale,
-  };
-}
-
-function drawLine(ctx, t, x1, y1, x2, y2, color, lw) {
-  ctx.beginPath();
-  ctx.moveTo(t.tx(x1), t.ty(y1));
-  ctx.lineTo(t.tx(x2), t.ty(y2));
-  ctx.strokeStyle = color || '#000';
-  ctx.lineWidth = lw || 2;
-  ctx.stroke();
-}
-
 function drawXMark(ctx, t, x, y, size) {
   const s = size || 0.5;
   drawLine(ctx, t, x - s, y - s, x + s, y + s, '#000', 1.5);
   drawLine(ctx, t, x - s, y + s, x + s, y - s, '#000', 1.5);
-}
-
-function drawDot(ctx, t, x, y, r, color) {
-  ctx.beginPath();
-  ctx.arc(t.tx(x), t.ty(y), r || 4, 0, 2 * Math.PI);
-  ctx.fillStyle = color || '#000';
-  ctx.fill();
-}
-
-function drawSquare(ctx, t, x, y, size, color) {
-  const s = size || 6;
-  ctx.fillStyle = color || '#000';
-  ctx.fillRect(t.tx(x) - s/2, t.ty(y) - s/2, s, s);
-}
-
-function drawText(ctx, t, x, y, text, opts) {
-  opts = opts || {};
-  ctx.save();
-  ctx.font = `${opts.weight || 'bold'} ${opts.size || 12}px -apple-system, sans-serif`;
-  ctx.fillStyle = opts.color || '#333';
-  ctx.textAlign = opts.align || 'center';
-  ctx.textBaseline = opts.baseline || 'middle';
-  const sx = t.tx(x), sy = t.ty(y);
-  if (opts.rotation) {
-    ctx.translate(sx, sy);
-    ctx.rotate(-opts.rotation * DEG2RAD);
-    ctx.fillText(text, 0, 0);
-  } else {
-    ctx.fillText(text, sx, sy);
-  }
-  ctx.restore();
 }
 
 function drawArrow(ctx, t, x1, y1, x2, y2, color) {
@@ -297,42 +218,6 @@ function drawArrow(ctx, t, x1, y1, x2, y2, color) {
     ctx.lineTo(sx + headLen * Math.cos(a + 0.4), sy + headLen * Math.sin(a + 0.4));
     ctx.stroke();
   }
-}
-
-function drawGrid(ctx, t, xMin, xMax, yMin, yMax, majorStep, minorStep) {
-  // Minor grid
-  ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = 0.3;
-  ctx.globalAlpha = 0.4;
-  for (let x = Math.ceil(xMin / minorStep) * minorStep; x <= xMax; x += minorStep) {
-    ctx.beginPath();
-    ctx.moveTo(t.tx(x), t.ty(yMin));
-    ctx.lineTo(t.tx(x), t.ty(yMax));
-    ctx.stroke();
-  }
-  for (let y = Math.ceil(yMin / minorStep) * minorStep; y <= yMax; y += minorStep) {
-    ctx.beginPath();
-    ctx.moveTo(t.tx(xMin), t.ty(y));
-    ctx.lineTo(t.tx(xMax), t.ty(y));
-    ctx.stroke();
-  }
-  // Major grid
-  ctx.strokeStyle = '#aaa';
-  ctx.lineWidth = 0.5;
-  ctx.globalAlpha = 0.5;
-  for (let x = Math.ceil(xMin / majorStep) * majorStep; x <= xMax; x += majorStep) {
-    ctx.beginPath();
-    ctx.moveTo(t.tx(x), t.ty(yMin));
-    ctx.lineTo(t.tx(x), t.ty(yMax));
-    ctx.stroke();
-  }
-  for (let y = Math.ceil(yMin / majorStep) * majorStep; y <= yMax; y += majorStep) {
-    ctx.beginPath();
-    ctx.moveTo(t.tx(xMin), t.ty(y));
-    ctx.lineTo(t.tx(xMax), t.ty(y));
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1.0;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -395,8 +280,6 @@ function drawCrossSection(g) {
 
   // Horizontal reference line
   drawLine(ctx, t, 0, LEFT_WALL_H, arcR + 1, LEFT_WALL_H, '#c0392b', 1);
-  ctx.globalAlpha = 0.5;
-  ctx.globalAlpha = 1.0;
 
   drawText(ctx, t, arcR + 0.8, LEFT_WALL_H - 1.0, `${pitchDeg.toFixed(0)}\u00B0`, { color: '#c0392b', size: 13, align: 'left' });
 

@@ -170,20 +170,8 @@
   <button onclick="shareLink()">Copy Share Link</button>
 </div>
 
+<script src="dome-shared.js"></script>
 <script>
-// ===================================================================
-// Constants
-// ===================================================================
-var LEFT_WALL_H = 20.0;
-var RIGHT_POST_H = 8.0;
-var ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H;
-var INTERIOR_WALL_H = 12.0;
-var BACK_WALL_LEN = 30.0;
-var DOME_R = 16.5;
-var CONN_ANGLE_DEG = 20.0;
-var WALL_ANGLE_DEG = -25.0;
-var DEG2RAD = Math.PI / 180;
-
 // ===================================================================
 // Geometry Engine
 // ===================================================================
@@ -194,97 +182,6 @@ function computeGeometry(pitchDeg) {
   var rafterLen = ROOF_DROP / Math.sin(rad);
   var rightSection = horizSpan - wallX;
   return { pitchDeg: pitchDeg, rad: rad, horizSpan: horizSpan, wallX: wallX, rafterLen: rafterLen, rightSection: rightSection };
-}
-
-// ===================================================================
-// Drawing Utilities
-// ===================================================================
-function setupCanvas(canvas) {
-  var dpr = window.devicePixelRatio || 1;
-  var rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  var ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  return { ctx: ctx, w: rect.width, h: rect.height };
-}
-
-function makeTransform(w, h, xMin, xMax, yMin, yMax) {
-  var padX = 0.05 * w, padY = 0.05 * h;
-  var drawW = w - 2 * padX;
-  var drawH = h - 2 * padY;
-  var scaleX = drawW / (xMax - xMin);
-  var scaleY = drawH / (yMax - yMin);
-  var scale = Math.min(scaleX, scaleY);
-  var offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
-  var offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
-  return {
-    tx: function(x) { return offsetX + (x - xMin) * scale; },
-    ty: function(y) { return h - (offsetY + (y - yMin) * scale); },
-    scale: scale
-  };
-}
-
-function drawLine(ctx, t, x1, y1, x2, y2, color, lw) {
-  ctx.beginPath();
-  ctx.moveTo(t.tx(x1), t.ty(y1));
-  ctx.lineTo(t.tx(x2), t.ty(y2));
-  ctx.strokeStyle = color || '#000';
-  ctx.lineWidth = lw || 2;
-  ctx.stroke();
-}
-
-function drawDot(ctx, t, x, y, r, color) {
-  ctx.beginPath();
-  ctx.arc(t.tx(x), t.ty(y), r || 4, 0, 2 * Math.PI);
-  ctx.fillStyle = color || '#000';
-  ctx.fill();
-}
-
-function drawSquare(ctx, t, x, y, size, color) {
-  var s = size || 6;
-  ctx.fillStyle = color || '#000';
-  ctx.fillRect(t.tx(x) - s/2, t.ty(y) - s/2, s, s);
-}
-
-function drawText(ctx, t, x, y, text, opts) {
-  opts = opts || {};
-  ctx.save();
-  ctx.font = (opts.weight || 'bold') + ' ' + (opts.size || 12) + 'px -apple-system, sans-serif';
-  ctx.fillStyle = opts.color || '#333';
-  ctx.textAlign = opts.align || 'center';
-  ctx.textBaseline = opts.baseline || 'middle';
-  var sx = t.tx(x), sy = t.ty(y);
-  if (opts.rotation) {
-    ctx.translate(sx, sy);
-    ctx.rotate(-opts.rotation * DEG2RAD);
-    ctx.fillText(text, 0, 0);
-  } else {
-    ctx.fillText(text, sx, sy);
-  }
-  ctx.restore();
-}
-
-function drawGrid(ctx, t, xMin, xMax, yMin, yMax, majorStep, minorStep) {
-  ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = 0.3;
-  ctx.globalAlpha = 0.4;
-  for (var x = Math.ceil(xMin / minorStep) * minorStep; x <= xMax; x += minorStep) {
-    ctx.beginPath(); ctx.moveTo(t.tx(x), t.ty(yMin)); ctx.lineTo(t.tx(x), t.ty(yMax)); ctx.stroke();
-  }
-  for (var y = Math.ceil(yMin / minorStep) * minorStep; y <= yMax; y += minorStep) {
-    ctx.beginPath(); ctx.moveTo(t.tx(xMin), t.ty(y)); ctx.lineTo(t.tx(xMax), t.ty(y)); ctx.stroke();
-  }
-  ctx.strokeStyle = '#aaa';
-  ctx.lineWidth = 0.5;
-  ctx.globalAlpha = 0.5;
-  for (var x2 = Math.ceil(xMin / majorStep) * majorStep; x2 <= xMax; x2 += majorStep) {
-    ctx.beginPath(); ctx.moveTo(t.tx(x2), t.ty(yMin)); ctx.lineTo(t.tx(x2), t.ty(yMax)); ctx.stroke();
-  }
-  for (var y2 = Math.ceil(yMin / majorStep) * majorStep; y2 <= yMax; y2 += majorStep) {
-    ctx.beginPath(); ctx.moveTo(t.tx(xMin), t.ty(y2)); ctx.lineTo(t.tx(xMax), t.ty(y2)); ctx.stroke();
-  }
-  ctx.globalAlpha = 1.0;
 }
 
 // ===================================================================
@@ -303,13 +200,20 @@ function drawFloorPlan(g) {
   ctx.fillRect(0, 0, w, h);
   drawGrid(ctx, t, xMin, xMax, yMin, yMax, 5, 1);
 
+  // --- Named dimensions ---
+  var ENTRY_HALFWIDTH = 4.0;
+  var ENTRY_DEPTH = 5.0;
+  var BEDROOM_DEPTH = 17.0;
+  var DOOR_WIDTH = 3.0;
+  var CLOSET_DOOR_WIDTH = 2.5;
+
   var wallX = g.wallX, rightSection = g.rightSection;
   var r = DOME_R;
   var wallAngle = WALL_ANGLE_DEG * DEG2RAD;
   var connRad = CONN_ANGLE_DEG * DEG2RAD;
 
   // --- DOME setup (arc drawn after wing geometry for gap calculation) ---
-  var halfWidth = 4.0;
+  var halfWidth = ENTRY_HALFWIDTH;
   var yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
   var entryAngleR = Math.atan2(yInt, halfWidth);
   var entryAngleL = Math.atan2(yInt, -halfWidth);
@@ -354,36 +258,58 @@ function drawFloorPlan(g) {
     drawDot(ctx, t, w3eX, w3eY, 4);
   }
 
-  // --- DOME ARC (3 segments: gaps at entry and wing attachments) ---
-  function drawDomeArc(startA, endA) {
-    if (endA < startA) endA += 2 * Math.PI;
+  // --- DOOR HELPER ---
+  // Draws a door: white-out gap in wall, door leaf, dashed swing arc
+  // hx,hy = hinge position; gapDir = unit vec along wall for gap; swingDir = unit vec into room
+  function drawDoor(hx, hy, gapDirX, gapDirY, swingDirX, swingDirY, width) {
+    var w = width || 3.0;
+    // Erase wall segment
+    drawLine(ctx, t, hx, hy, hx + w * gapDirX, hy + w * gapDirY, '#fff', 5);
+    // Door leaf
+    drawLine(ctx, t, hx, hy, hx + w * swingDirX, hy + w * swingDirY, '#555', 1.5);
+    // Swing arc
+    var closedA = Math.atan2(gapDirY, gapDirX);
+    var openA = Math.atan2(swingDirY, swingDirX);
+    var sweep = openA - closedA;
+    if (sweep > Math.PI) sweep -= 2 * Math.PI;
+    if (sweep < -Math.PI) sweep += 2 * Math.PI;
     ctx.beginPath();
-    var steps = Math.max(80, Math.round((endA - startA) * 80));
-    for (var i = 0; i <= steps; i++) {
-      var a = startA + (endA - startA) * (i / steps);
-      var px = r * Math.cos(a), py = r * Math.sin(a);
-      if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
-      else ctx.lineTo(t.tx(px), t.ty(py));
+    for (var i = 0; i <= 30; i++) {
+      var a = closedA + (i / 30) * sweep;
+      var dx = hx + w * Math.cos(a);
+      var dy = hy + w * Math.sin(a);
+      if (i === 0) ctx.moveTo(t.tx(dx), t.ty(dy));
+      else ctx.lineTo(t.tx(dx), t.ty(dy));
     }
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-  function drawDomeArcGhost(startA, endA) {
-    if (endA < startA) endA += 2 * Math.PI;
-    ctx.beginPath();
-    var steps = Math.max(80, Math.round((endA - startA) * 80));
-    for (var i = 0; i <= steps; i++) {
-      var a = startA + (endA - startA) * (i / steps);
-      var px = r * Math.cos(a), py = r * Math.sin(a);
-      if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
-      else ctx.lineTo(t.tx(px), t.ty(py));
-    }
-    ctx.strokeStyle = 'rgba(200,80,80,0.25)';
+    ctx.strokeStyle = '#999';
     ctx.lineWidth = 0.8;
-    ctx.setLineDash([3, 4]);
+    ctx.setLineDash([3, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+
+  // --- DOME ARC (3 segments: gaps at entry and wing attachments) ---
+  function drawDomeArc(startA, endA, ghost) {
+    if (endA < startA) endA += 2 * Math.PI;
+    ctx.beginPath();
+    var steps = Math.max(80, Math.round((endA - startA) * 80));
+    for (var i = 0; i <= steps; i++) {
+      var a = startA + (endA - startA) * (i / steps);
+      var px = r * Math.cos(a), py = r * Math.sin(a);
+      if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
+      else ctx.lineTo(t.tx(px), t.ty(py));
+    }
+    if (ghost) {
+      ctx.strokeStyle = 'rgba(200,80,80,0.25)';
+      ctx.lineWidth = 0.8;
+      ctx.setLineDash([3, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
   }
   if (disc >= 0) {
     var w3AngleR = Math.atan2(w3eY, w3eX);
@@ -393,8 +319,8 @@ function drawFloorPlan(g) {
     drawDomeArc(connRad, Math.PI - connRad);
     drawDomeArc(w3AngleL, entryAngleL);
     // Ghost arcs where dome wall was removed
-    drawDomeArcGhost(w3AngleR, connRad);
-    drawDomeArcGhost(Math.PI - connRad, w3AngleL);
+    drawDomeArc(w3AngleR, connRad, true);
+    drawDomeArc(Math.PI - connRad, w3AngleL, true);
   } else {
     drawDomeArc(entryAngleR, entryAngleL + 2 * Math.PI);
   }
@@ -425,8 +351,8 @@ function drawFloorPlan(g) {
       { color: '#333', size: 11, rotation: w3Angle * 180 / Math.PI + 180 });
   }
 
-  // --- RIGHT WING BEDROOM (17' x wallX') ---
-  var bedroomDepth = 17.0;
+  // --- RIGHT WING BEDROOM ---
+  var bedroomDepth = BEDROOM_DEPTH;
   var b1x = weX + bedroomDepth * (Px - weX) / BACK_WALL_LEN;
   var b1y = weY + bedroomDepth * (Py - weY) / BACK_WALL_LEN;
   var b2x = w2eX + bedroomDepth * w3DirX;
@@ -442,7 +368,7 @@ function drawFloorPlan(g) {
   drawText(ctx, t, brCx, brCy - 1.5, '17\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
 
   // --- RIGHT WING BATHROOM (16' deep, length computed to touch dome) ---
-  var bathWallDepth = 17.0; // perpendicular to back wall (matches bedroom depth)
+  var bathWallDepth = BEDROOM_DEPTH; // perpendicular to back wall (matches bedroom depth)
   var backToPx = (Px - weX) / BACK_WALL_LEN;
   var backToPy = (Py - weY) / BACK_WALL_LEN;
   // bath4 = B1 + 16' perpendicular to back wall (on bedroom partition line)
@@ -504,7 +430,7 @@ function drawFloorPlan(g) {
   drawLine(ctx, t, mb1x, mb1y, mb2x, mb2y, '#000', 2);
   drawDot(ctx, t, mb1x, mb1y, 4);
   drawDot(ctx, t, mb2x, mb2y, 4);
-  drawText(ctx, t, -brCx, brCy, 'Bedroom', { color: '#555', size: 11 });
+  drawText(ctx, t, -brCx, brCy, 'Workshop', { color: '#555', size: 11 });
   drawText(ctx, t, -brCx, brCy - 1.5, '17\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
 
   // --- LEFT WING SMALL BATHROOM (square between B2 and W3) ---
@@ -555,33 +481,13 @@ function drawFloorPlan(g) {
   drawDot(ctx, t, -halfWidth, yInt, 5);
   drawDot(ctx, t, halfWidth, yInt, 5);
 
-  // Dome face wall with 3' door opening centered
-  var doorHalf = 1.5;
-  drawLine(ctx, t, -halfWidth, yInt, -doorHalf, yInt, '#000', 2);
-  drawLine(ctx, t, doorHalf, yInt, halfWidth, yInt, '#000', 2);
-
-  // Door symbol: hinged on right, swings inward (into dome, upward)
-  var doorW = doorHalf * 2;
-  var hingeX = doorHalf, hingeY = yInt;
-  drawLine(ctx, t, hingeX, hingeY, hingeX, hingeY + doorW, '#555', 1.5);
-  ctx.beginPath();
-  var arcSteps = 30;
-  for (var di = 0; di <= arcSteps; di++) {
-    var da = Math.PI + (di / arcSteps) * (-Math.PI / 2);
-    var dx = hingeX + doorW * Math.cos(da);
-    var dy = hingeY + doorW * Math.sin(da);
-    if (di === 0) ctx.moveTo(t.tx(dx), t.ty(dy));
-    else ctx.lineTo(t.tx(dx), t.ty(dy));
-  }
-  ctx.strokeStyle = '#999';
-  ctx.lineWidth = 0.8;
-  ctx.setLineDash([3, 3]);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // Dome face wall with door opening centered, hinged right, swings inward
+  drawLine(ctx, t, -halfWidth, yInt, halfWidth, yInt, '#000', 2);
+  drawDoor(DOOR_WIDTH / 2, yInt, -1, 0, 0, 1, DOOR_WIDTH);
 
   // Entry box side walls and solid bottom wall
-  var leftBot = [-halfWidth, yInt - 5];
-  var rightBot = [halfWidth, yInt - 5];
+  var leftBot = [-halfWidth, yInt - ENTRY_DEPTH];
+  var rightBot = [halfWidth, yInt - ENTRY_DEPTH];
   drawLine(ctx, t, -halfWidth, yInt, leftBot[0], leftBot[1], '#000', 2);
   drawLine(ctx, t, halfWidth, yInt, rightBot[0], rightBot[1], '#000', 2);
   drawLine(ctx, t, leftBot[0], leftBot[1], rightBot[0], rightBot[1], '#000', 2);
@@ -627,6 +533,35 @@ function drawFloorPlan(g) {
   var closetLabelY = (yInt + closetY) / 2;
   drawText(ctx, t, closetLabelX, closetLabelY, 'Storage', { color: '#666', size: 9 });
   drawText(ctx, t, -closetLabelX, closetLabelY, 'Storage', { color: '#666', size: 9 });
+
+  // --- INTERIOR DOORS ---
+  if (disc >= 0) {
+    // Right wing bedroom door — in partition B1→B2, 8' from B1 (en-suite to bathroom)
+    var rbd_hx = b1x + 8 * w2DirX, rbd_hy = b1y + 8 * w2DirY;
+    drawDoor(rbd_hx, rbd_hy, w2DirX, w2DirY, -w3DirX, -w3DirY);
+
+    // Right wing bathroom door — in bath2→bath3 wall, 3/4 up from bath2
+    if (typeof bath2x !== 'undefined') {
+      var rbtd_hx = bath2x + 12.75 * w2DirX, rbtd_hy = bath2y + 12.75 * w2DirY;
+      drawDoor(rbtd_hx, rbtd_hy, w2DirX, w2DirY, -w3DirX, -w3DirY);
+    }
+
+    // Left wing workshop door — in partition, 3' from mb1 (back wall end)
+    // Mirror: left w2Dir = (-w2DirX, w2DirY), left -w3Dir = (w3DirX, -w3DirY)
+    var lwd_hx = -b1x - 3 * w2DirX, lwd_hy = b1y + 3 * w2DirY;
+    drawDoor(lwd_hx, lwd_hy, -w2DirX, w2DirY, w3DirX, -w3DirY);
+
+    // Left wing bathroom door — in msb4→mb2 wall, 3' from mb2 toward msb4
+    // Mirror: gap toward mb2 = left w2Dir, swing into bath = left w3Dir
+    var lbd_hx = -b2x + 3 * w2DirX, lbd_hy = b2y - 3 * w2DirY;
+    drawDoor(lbd_hx, lbd_hy, -w2DirX, w2DirY, -w3DirX, w3DirY, CLOSET_DOOR_WIDTH);
+  }
+
+  // Storage closet doors — open toward dome interior
+  // Right closet
+  drawDoor(halfWidth + 1.5, closetY, 1, 0, 0, 1, CLOSET_DOOR_WIDTH);
+  // Left closet
+  drawDoor(-(halfWidth + 1.5), closetY, -1, 0, 0, 1, CLOSET_DOOR_WIDTH);
 
   // Title
   ctx.font = 'bold 14px -apple-system, sans-serif';

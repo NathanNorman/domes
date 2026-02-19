@@ -222,19 +222,11 @@
   <button onclick="shareLink()">Copy Share Link</button>
 </div>
 
+<script src="dome-shared.js"></script>
 <script>
 // ===================================================================
-// Constants
+// Constants (local to this view)
 // ===================================================================
-var LEFT_WALL_H = 20.0;
-var RIGHT_POST_H = 8.0;
-var ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
-var INTERIOR_WALL_H = 12.0;
-var BACK_WALL_LEN = 30.0;
-var DOME_R = 16.5;
-var CONN_ANGLE_DEG = 20.0;
-var WALL_ANGLE_DEG = -25.0;
-var DEG2RAD = Math.PI / 180;
 var ENTRY_HALF_W = 4.0;
 var ENTRY_DEPTH = 5.0;
 
@@ -450,35 +442,6 @@ function computeUnfoldedPanel(g) {
 }
 
 // ===================================================================
-// Drawing Utilities
-// ===================================================================
-function setupCanvas(canvas) {
-  var dpr = window.devicePixelRatio || 1;
-  var rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  var ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  return { ctx: ctx, w: rect.width, h: rect.height };
-}
-
-function makeTransform(w, h, xMin, xMax, yMin, yMax) {
-  var padX = 0.08 * w, padY = 0.08 * h;
-  var drawW = w - 2 * padX;
-  var drawH = h - 2 * padY;
-  var scaleX = drawW / (xMax - xMin);
-  var scaleY = drawH / (yMax - yMin);
-  var scale = Math.min(scaleX, scaleY);
-  var offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
-  var offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
-  return {
-    tx: function(x) { return offsetX + (x - xMin) * scale; },
-    ty: function(y) { return h - (offsetY + (y - yMin) * scale); },
-    scale: scale
-  };
-}
-
-// ===================================================================
 // Panel Renderer
 // ===================================================================
 function drawPanel(g) {
@@ -495,7 +458,7 @@ function drawPanel(g) {
   var xMax = Math.max.apply(null, xs) + 6;
   var yMin = Math.min.apply(null, ys) - 6;
   var yMax = Math.max.apply(null, ys) + 5;
-  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax, 0.08);
 
   // Background
   ctx.fillStyle = '#fff';

@@ -161,20 +161,8 @@
   </div>
 </div>
 
+<script src="dome-shared.js"></script>
 <script>
-// ===================================================================
-// Constants
-// ===================================================================
-const LEFT_WALL_H = 20.0;
-const RIGHT_POST_H = 8.0;
-const ROOF_DROP = LEFT_WALL_H - RIGHT_POST_H; // 12
-const BACK_WALL_LEN = 30.0;
-const DOME_R = 16.5;
-const CONN_ANGLE_DEG = 20.0;
-const WALL_ANGLE_DEG = -25.0;
-
-const DEG2RAD = Math.PI / 180;
-const RAD2DEG = 180 / Math.PI;
 
 // ===================================================================
 // Geometry Engine
@@ -189,68 +177,8 @@ function computeGeometry(pitchDeg) {
 }
 
 // ===================================================================
-// Drawing Utilities
+// Drawing Utilities (unique to this view)
 // ===================================================================
-function setupCanvas(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  return { ctx, w: rect.width, h: rect.height };
-}
-
-function makeTransform(w, h, xMin, xMax, yMin, yMax) {
-  const padX = 0.08 * w, padY = 0.08 * h;
-  const drawW = w - 2 * padX;
-  const drawH = h - 2 * padY;
-  const scaleX = drawW / (xMax - xMin);
-  const scaleY = drawH / (yMax - yMin);
-  const scale = Math.min(scaleX, scaleY);
-  const offsetX = padX + (drawW - scale * (xMax - xMin)) / 2;
-  const offsetY = padY + (drawH - scale * (yMax - yMin)) / 2;
-  return {
-    tx: (x) => offsetX + (x - xMin) * scale,
-    ty: (y) => h - (offsetY + (y - yMin) * scale),
-    scale,
-  };
-}
-
-function drawLine(ctx, t, x1, y1, x2, y2, color, lw) {
-  ctx.beginPath();
-  ctx.moveTo(t.tx(x1), t.ty(y1));
-  ctx.lineTo(t.tx(x2), t.ty(y2));
-  ctx.strokeStyle = color || '#000';
-  ctx.lineWidth = lw || 2;
-  ctx.stroke();
-}
-
-function drawDot(ctx, t, x, y, r, color) {
-  ctx.beginPath();
-  ctx.arc(t.tx(x), t.ty(y), r || 4, 0, 2 * Math.PI);
-  ctx.fillStyle = color || '#000';
-  ctx.fill();
-}
-
-function drawText(ctx, t, x, y, text, opts) {
-  opts = opts || {};
-  ctx.save();
-  ctx.font = (opts.weight || 'bold') + ' ' + (opts.size || 12) + 'px -apple-system, sans-serif';
-  ctx.fillStyle = opts.color || '#333';
-  ctx.textAlign = opts.align || 'center';
-  ctx.textBaseline = opts.baseline || 'middle';
-  var sx = t.tx(x), sy = t.ty(y);
-  if (opts.rotation) {
-    ctx.translate(sx, sy);
-    ctx.rotate(-opts.rotation * DEG2RAD);
-    ctx.fillText(text, 0, 0);
-  } else {
-    ctx.fillText(text, sx, sy);
-  }
-  ctx.restore();
-}
-
 function drawArc(ctx, t, cx, cy, r, startDeg, endDeg, color, lw) {
   var steps = 120;
   var s0 = startDeg * DEG2RAD;
@@ -452,7 +380,7 @@ function drawElevation(pitchDeg, viewAngleDeg, opaque) {
   var yMin = -3;
   var yMax = domePeak + 3;
 
-  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax, 0.08);
 
   // --- Background ---
   if (opaque) {
@@ -815,7 +743,7 @@ function drawJunctionDetail(pitchDeg) {
   var yMin = connY - viewR;
   var yMax = connY + viewR;
 
-  var t = makeTransform(w, h, xMin, xMax, yMin, yMax);
+  var t = makeTransform(w, h, xMin, xMax, yMin, yMax, 0.08);
 
   // Background grid (subtle)
   ctx.save();
