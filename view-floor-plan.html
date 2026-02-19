@@ -150,7 +150,7 @@
 <div class="controls">
   <div class="slider-row">
     <label for="pitch-slider">Roof Pitch:</label>
-    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="25">
+    <input type="range" id="pitch-slider" min="20" max="35" step="0.5" value="26.5">
     <span class="value" id="pitch-value">25.0&deg;</span>
   </div>
 </div>
@@ -203,7 +203,7 @@ function drawFloorPlan(g) {
   // --- Named dimensions ---
   var ENTRY_HALFWIDTH = 4.0;
   var ENTRY_DEPTH = 5.0;
-  var BEDROOM_DEPTH = 17.0;
+  var BEDROOM_DEPTH = 18.0;
   var DOOR_WIDTH = 3.0;
   var CLOSET_DOOR_WIDTH = 2.5;
 
@@ -346,9 +346,16 @@ function drawFloorPlan(g) {
 
   if (disc >= 0) {
     var perp3X = Math.sin(w3Angle), perp3Y = -Math.cos(w3Angle);
-    var w3mX = (w2eX + w3eX) / 2, w3mY = (w2eY + w3eY) / 2;
-    drawText(ctx, t, w3mX + 2 * perp3X, w3mY + 2 * perp3Y, tHit.toFixed(1) + "'",
-      { color: '#333', size: 11, rotation: w3Angle * 180 / Math.PI + 180 });
+    var bdDepth = BEDROOM_DEPTH;
+    var splitX = w2eX + bdDepth * w3DirX, splitY = w2eY + bdDepth * w3DirY;
+    // Bedroom section of inner wall
+    var m1x = (w2eX + splitX) / 2, m1y = (w2eY + splitY) / 2;
+    drawText(ctx, t, m1x + 2 * perp3X, m1y + 2 * perp3Y, bdDepth + "' (bdrm)",
+      { color: '#555', size: 10, rotation: w3Angle * 180 / Math.PI + 180 });
+    // Bath section of inner wall
+    var m2x = (splitX + w3eX) / 2, m2y = (splitY + w3eY) / 2;
+    drawText(ctx, t, m2x + 2 * perp3X, m2y + 2 * perp3Y, (tHit - bdDepth).toFixed(1) + "' (bath)",
+      { color: '#555', size: 10, rotation: w3Angle * 180 / Math.PI + 180 });
   }
 
   // --- RIGHT WING BEDROOM ---
@@ -365,10 +372,10 @@ function drawFloorPlan(g) {
   var brCx = (weX + b1x + b2x + w2eX) / 4;
   var brCy = (weY + b1y + b2y + w2eY) / 4;
   drawText(ctx, t, brCx, brCy, 'Bedroom', { color: '#555', size: 11 });
-  drawText(ctx, t, brCx, brCy - 1.5, '17\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
+  drawText(ctx, t, brCx, brCy - 1.5, bedroomDepth + '\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
 
   // --- RIGHT WING BATHROOM (16' deep, length computed to touch dome) ---
-  var bathWallDepth = BEDROOM_DEPTH; // perpendicular to back wall (matches bedroom depth)
+  var bathWallDepth = wallX; // perpendicular to back wall = full wing depth
   var backToPx = (Px - weX) / BACK_WALL_LEN;
   var backToPy = (Py - weY) / BACK_WALL_LEN;
   // bath4 = B1 + 16' perpendicular to back wall (on bedroom partition line)
@@ -395,7 +402,7 @@ function drawFloorPlan(g) {
     var bathCx = (b1x + bath2x + bath3x + bath4x) / 4;
     var bathCy = (b1y + bath2y + bath3y + bath4y) / 4;
     drawText(ctx, t, bathCx, bathCy, 'Bath', { color: '#555', size: 11 });
-    drawText(ctx, t, bathCx, bathCy - 1.5, Math.round(bathLen) + '\' × 17\'', { color: '#888', size: 9 });
+    drawText(ctx, t, bathCx, bathCy - 1.5, bathLen.toFixed(1) + '\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
   }
 
   // --- LEFT WING (mirror) ---
@@ -419,9 +426,14 @@ function drawFloorPlan(g) {
     drawLine(ctx, t, mw2eLx, mw2eLy, mw3eLx, mw3eLy, '#000', 2);
     drawDot(ctx, t, mw3eLx, mw3eLy, 4);
 
-    var mw3mLx = -(w2eX + w3eX) / 2, mw3mLy = (w2eY + w3eY) / 2;
-    drawText(ctx, t, mw3mLx - 2 * perp3X, mw3mLy + 2 * perp3Y, tHit.toFixed(1) + "'",
-      { color: '#333', size: 11, rotation: -(w3Angle * 180 / Math.PI + 180) });
+    // Workshop section of inner wall (splitX/splitY/bdDepth from right wing block above)
+    var lm1x = (-w2eX - splitX) / 2, lm1y = (w2eY + splitY) / 2;
+    drawText(ctx, t, lm1x - 2 * perp3X, lm1y + 2 * perp3Y, bdDepth + "' (wkshp)",
+      { color: '#555', size: 10, rotation: -(w3Angle * 180 / Math.PI + 180) });
+    // Bath section of inner wall
+    var lm2x = (-splitX - w3eX) / 2, lm2y = (splitY + w3eY) / 2;
+    drawText(ctx, t, lm2x - 2 * perp3X, lm2y + 2 * perp3Y, (tHit - bdDepth).toFixed(1) + "' (bath)",
+      { color: '#555', size: 10, rotation: -(w3Angle * 180 / Math.PI + 180) });
   }
 
   // --- LEFT WING BEDROOM (mirror) ---
@@ -431,7 +443,7 @@ function drawFloorPlan(g) {
   drawDot(ctx, t, mb1x, mb1y, 4);
   drawDot(ctx, t, mb2x, mb2y, 4);
   drawText(ctx, t, -brCx, brCy, 'Workshop', { color: '#555', size: 11 });
-  drawText(ctx, t, -brCx, brCy - 1.5, '17\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
+  drawText(ctx, t, -brCx, brCy - 1.5, bedroomDepth + '\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
 
   // --- LEFT WING SMALL BATHROOM (square between B2 and W3) ---
   if (disc >= 0) {
@@ -456,7 +468,7 @@ function drawFloorPlan(g) {
     var sbCx = (-w3eX + msb3x + msb4x + mb2x) / 4;
     var sbCy = (w3eY + msb3y + msb4y + mb2y) / 4;
     drawText(ctx, t, sbCx, sbCy, 'Bath', { color: '#555', size: 11 });
-    drawText(ctx, t, sbCx, sbCy - 1.5, Math.round(smallBathSide) + '\' × ' + Math.round(smallBathSide) + '\'', { color: '#888', size: 9 });
+    drawText(ctx, t, sbCx, sbCy - 1.5, smallBathSide.toFixed(1) + '\' × ' + smallBathSide.toFixed(1) + '\'', { color: '#888', size: 9 });
   }
 
   // Left wing dimension labels
