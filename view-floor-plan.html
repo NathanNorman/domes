@@ -308,24 +308,11 @@ function drawFloorPlan(g) {
   var wallAngle = WALL_ANGLE_DEG * DEG2RAD;
   var connRad = CONN_ANGLE_DEG * DEG2RAD;
 
-  // --- DOME (entry opening removed) ---
+  // --- DOME setup (arc drawn after wing geometry for gap calculation) ---
   var halfWidth = 4.0;
   var yInt = -Math.sqrt(r * r - halfWidth * halfWidth);
   var entryAngleR = Math.atan2(yInt, halfWidth);
   var entryAngleL = Math.atan2(yInt, -halfWidth);
-  // Draw the large arc from right entry point counterclockwise to left entry point
-  ctx.beginPath();
-  var domeStart = entryAngleR;
-  var domeEnd = entryAngleL + 2 * Math.PI;
-  for (var i = 0; i <= 500; i++) {
-    var a = domeStart + (domeEnd - domeStart) * (i / 500);
-    var px = r * Math.cos(a), py = r * Math.sin(a);
-    if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
-    else ctx.lineTo(t.tx(px), t.ty(py));
-  }
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
-  ctx.stroke();
 
   drawText(ctx, t, 0, 0, 'B', { color: '#333', size: 16 });
 
@@ -367,6 +354,51 @@ function drawFloorPlan(g) {
     drawDot(ctx, t, w3eX, w3eY, 4);
   }
 
+  // --- DOME ARC (3 segments: gaps at entry and wing attachments) ---
+  function drawDomeArc(startA, endA) {
+    if (endA < startA) endA += 2 * Math.PI;
+    ctx.beginPath();
+    var steps = Math.max(80, Math.round((endA - startA) * 80));
+    for (var i = 0; i <= steps; i++) {
+      var a = startA + (endA - startA) * (i / steps);
+      var px = r * Math.cos(a), py = r * Math.sin(a);
+      if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
+      else ctx.lineTo(t.tx(px), t.ty(py));
+    }
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  function drawDomeArcGhost(startA, endA) {
+    if (endA < startA) endA += 2 * Math.PI;
+    ctx.beginPath();
+    var steps = Math.max(80, Math.round((endA - startA) * 80));
+    for (var i = 0; i <= steps; i++) {
+      var a = startA + (endA - startA) * (i / steps);
+      var px = r * Math.cos(a), py = r * Math.sin(a);
+      if (i === 0) ctx.moveTo(t.tx(px), t.ty(py));
+      else ctx.lineTo(t.tx(px), t.ty(py));
+    }
+    ctx.strokeStyle = 'rgba(200,80,80,0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([3, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (disc >= 0) {
+    var w3AngleR = Math.atan2(w3eY, w3eX);
+    var w3AngleL = Math.atan2(w3eY, -w3eX);
+    // Solid segments
+    drawDomeArc(entryAngleR, w3AngleR);
+    drawDomeArc(connRad, Math.PI - connRad);
+    drawDomeArc(w3AngleL, entryAngleL);
+    // Ghost arcs where dome wall was removed
+    drawDomeArcGhost(w3AngleR, connRad);
+    drawDomeArcGhost(Math.PI - connRad, w3AngleL);
+  } else {
+    drawDomeArc(entryAngleR, entryAngleL + 2 * Math.PI);
+  }
+
   // Right wing dimension labels
   var perpX = Math.sin(wallAngle), perpY = -Math.cos(wallAngle);
   var wmX = (Px + weX) / 2, wmY = (Py + weY) / 2;
@@ -393,6 +425,53 @@ function drawFloorPlan(g) {
       { color: '#333', size: 11, rotation: w3Angle * 180 / Math.PI + 180 });
   }
 
+  // --- RIGHT WING BEDROOM (17' x wallX') ---
+  var bedroomDepth = 17.0;
+  var b1x = weX + bedroomDepth * (Px - weX) / BACK_WALL_LEN;
+  var b1y = weY + bedroomDepth * (Py - weY) / BACK_WALL_LEN;
+  var b2x = w2eX + bedroomDepth * w3DirX;
+  var b2y = w2eY + bedroomDepth * w3DirY;
+  drawLine(ctx, t, b1x, b1y, b2x, b2y, '#000', 2);
+  drawDot(ctx, t, b1x, b1y, 4);
+  drawDot(ctx, t, b2x, b2y, 4);
+
+  // Bedroom label
+  var brCx = (weX + b1x + b2x + w2eX) / 4;
+  var brCy = (weY + b1y + b2y + w2eY) / 4;
+  drawText(ctx, t, brCx, brCy, 'Bedroom', { color: '#555', size: 11 });
+  drawText(ctx, t, brCx, brCy - 1.5, '17\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
+
+  // --- RIGHT WING BATHROOM (16' deep, length computed to touch dome) ---
+  var bathWallDepth = 17.0; // perpendicular to back wall (matches bedroom depth)
+  var backToPx = (Px - weX) / BACK_WALL_LEN;
+  var backToPy = (Py - weY) / BACK_WALL_LEN;
+  // bath4 = B1 + 16' perpendicular to back wall (on bedroom partition line)
+  var bath4x = b1x + bathWallDepth * w2DirX;
+  var bath4y = b1y + bathWallDepth * w2DirY;
+  // Compute bathLen so bath3 = bath4 + bathLen*backToP lands on dome circle
+  var bqa = 1.0;
+  var bqb = 2 * (bath4x * backToPx + bath4y * backToPy);
+  var bqc = bath4x * bath4x + bath4y * bath4y - r * r;
+  var bqdisc = bqb * bqb - 4 * bqa * bqc;
+  if (bqdisc >= 0) {
+    var bathLen = (-bqb - Math.sqrt(bqdisc)) / (2 * bqa);
+    var bath2x = b1x + bathLen * backToPx;
+    var bath2y = b1y + bathLen * backToPy;
+    var bath3x = bath4x + bathLen * backToPx;
+    var bath3y = bath4y + bathLen * backToPy;
+    // Two new walls (back wall B1→bath2 and partition B1→bath4 already drawn)
+    drawLine(ctx, t, bath2x, bath2y, bath3x, bath3y, '#000', 2);
+    drawLine(ctx, t, bath3x, bath3y, bath4x, bath4y, '#000', 2);
+    drawDot(ctx, t, bath2x, bath2y, 4);
+    drawDot(ctx, t, bath3x, bath3y, 4);
+    drawDot(ctx, t, bath4x, bath4y, 4);
+    // Label
+    var bathCx = (b1x + bath2x + bath3x + bath4x) / 4;
+    var bathCy = (b1y + bath2y + bath3y + bath4y) / 4;
+    drawText(ctx, t, bathCx, bathCy, 'Bath', { color: '#555', size: 11 });
+    drawText(ctx, t, bathCx, bathCy - 1.5, Math.round(bathLen) + '\' × 17\'', { color: '#888', size: 9 });
+  }
+
   // --- LEFT WING (mirror) ---
   var mPLx = -Px, mPLy = Py;
   drawDot(ctx, t, mPLx, mPLy, 5);
@@ -417,6 +496,41 @@ function drawFloorPlan(g) {
     var mw3mLx = -(w2eX + w3eX) / 2, mw3mLy = (w2eY + w3eY) / 2;
     drawText(ctx, t, mw3mLx - 2 * perp3X, mw3mLy + 2 * perp3Y, tHit.toFixed(1) + "'",
       { color: '#333', size: 11, rotation: -(w3Angle * 180 / Math.PI + 180) });
+  }
+
+  // --- LEFT WING BEDROOM (mirror) ---
+  var mb1x = -b1x, mb1y = b1y;
+  var mb2x = -b2x, mb2y = b2y;
+  drawLine(ctx, t, mb1x, mb1y, mb2x, mb2y, '#000', 2);
+  drawDot(ctx, t, mb1x, mb1y, 4);
+  drawDot(ctx, t, mb2x, mb2y, 4);
+  drawText(ctx, t, -brCx, brCy, 'Bedroom', { color: '#555', size: 11 });
+  drawText(ctx, t, -brCx, brCy - 1.5, '17\' × ' + wallX.toFixed(1) + '\'', { color: '#888', size: 9 });
+
+  // --- LEFT WING SMALL BATHROOM (square between B2 and W3) ---
+  if (disc >= 0) {
+    var smallBathSide = tHit - bedroomDepth; // distance along inner wall from B2 to W3
+    // Right wing corners (then mirror x for left wing)
+    var sb3x = w3eX - smallBathSide * w2DirX;
+    var sb3y = w3eY - smallBathSide * w2DirY;
+    var sb4x = b2x - smallBathSide * w2DirX;
+    var sb4y = b2y - smallBathSide * w2DirY;
+    // Left wing (negate x)
+    var msb3x = -sb3x, msb3y = sb3y;
+    var msb4x = -sb4x, msb4y = sb4y;
+    // Wall from left W3 perpendicular to inner wall
+    drawLine(ctx, t, -w3eX, w3eY, msb3x, msb3y, '#000', 2);
+    // Wall parallel to inner wall (connects the two perpendicular walls)
+    drawLine(ctx, t, msb3x, msb3y, msb4x, msb4y, '#000', 2);
+    // Wall from left B2 perpendicular (shares line with bedroom partition, draw for closure)
+    drawLine(ctx, t, msb4x, msb4y, mb2x, mb2y, '#000', 2);
+    drawDot(ctx, t, msb3x, msb3y, 4);
+    drawDot(ctx, t, msb4x, msb4y, 4);
+    // Label
+    var sbCx = (-w3eX + msb3x + msb4x + mb2x) / 4;
+    var sbCy = (w3eY + msb3y + msb4y + mb2y) / 4;
+    drawText(ctx, t, sbCx, sbCy, 'Bath', { color: '#555', size: 11 });
+    drawText(ctx, t, sbCx, sbCy - 1.5, Math.round(smallBathSide) + '\' × ' + Math.round(smallBathSide) + '\'', { color: '#888', size: 9 });
   }
 
   // Left wing dimension labels
@@ -494,8 +608,8 @@ function drawFloorPlan(g) {
   ctx.globalAlpha = 1.0;
 
   // --- ENTRYWAY CLOSETS ---
-  var entryDepthInside = 4.0;
-  var closetY = yInt + entryDepthInside;
+  // Extend closets to W3 (inner wall → dome attachment point)
+  var closetY = (disc >= 0) ? w3eY : yInt + 4.0;
   var closetDomeX = Math.sqrt(r * r - closetY * closetY);
 
   // Right closet: vertical wall then horizontal to dome
